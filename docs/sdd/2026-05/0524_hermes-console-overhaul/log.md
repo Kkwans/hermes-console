@@ -12,7 +12,7 @@
 | T6 | ✅ | 2026-05-24 18:52 | 2026-05-24 18:58 | Session detail with message bubbles |
 | T7 | ✅ | 2026-05-24 19:17 | 2026-05-24 19:23 | Inline edit with PUT API |
 | T8 | ✅ | 2026-05-24 19:24 | 2026-05-24 19:26 | Confirm dialog before delete |
-| T9 | ⬜ | - | - | |
+| T9 | ✅ | 2026-05-24 19:46 | 2026-05-24 19:55 | Cron jobs list with rich metadata |
 | T10 | ⬜ | - | - | |
 | T11 | ⬜ | - | - | |
 | T12 | ⬜ | - | - | |
@@ -91,3 +91,15 @@
   - 点击删除按钮 → 弹出确认弹窗显示会话标题
   - 确认后会话从列表消失，计数从 50 → 49 → 48
   - 弹窗图标 🗑️、标题「删除会话」
+
+### 2026-05-24 T9 完成
+- **T9**: 实现定时任务列表 — 读取并展示 cron 数据
+- 改动：
+  - serve.py: `get_cron_jobs()` 添加 `/opt/data/cron/jobs.json` 路径；新增 `toggle_cron_job()`、`run_cron_job()`、`delete_cron_job()` 函数；API 路由调用真实实现
+  - index.html: cron 卡片展示 schedule_display、last_run_at（带成功/失败徽章）、next_run_at、deliver 渠道、last_error；空状态引导文案
+  - js/app.js: 新增 `confirmDeleteCron(job)` 函数并暴露到 return
+  - css/main.css: 新增 .cron-title-row、.cron-id、.cron-meta、.badge-xs、.empty-state-rich、.empty-hint 等样式
+- 验证：
+  - GET /api/cron 返回 2 个任务（hermes-console-dev、hermes-console-v2）
+  - POST /api/cron/:id/toggle 切换 enabled 状态并写回 jobs.json
+  - 浏览器 /#/cron 正确显示 2 个任务卡片，包含完整元数据
