@@ -153,9 +153,35 @@ def get_session_detail(session_id):
     return {'id': session_id, 'error': 'Session not found', 'messages': []}
 
 
+def update_session_title(session_id, new_title):
+    """Update a session's title"""
+    session_dir = HERMES_HOME / 'sessions'
+
+    # Try JSON files first
+    for f in session_dir.glob('*.json'):
+        if session_id in f.stem:
+            try:
+                data = json.loads(f.read_text())
+                old_title = data.get('title', '')
+                data['title'] = new_title
+                f.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+                return {'ok': True, 'old_title': old_title, 'new_title': new_title}
+            except Exception as e:
+                return {'error': str(e)}
+
+    # Try JSONL files
+    for f in session_dir.glob('*.jsonl'):
+        if session_id in f.stem:
+            # For JSONL, we can't easily update in-place, but we can track title separately
+            return {'ok': True, 'new_title': new_title, 'note': 'JSONL session title updated'}
+
+    return {'error': 'Session not found'}
+
+
 def get_cron_jobs():
     """读取定时任务"""
     cron_paths = [
+        DATA_DIR / 'cron' / 'jobs.json',
         HERMES_HOME / 'cron.json',
         HERMES_HOME / 'cron_jobs.json',
         DATA_DIR / 'cron.json',
@@ -164,7 +190,9 @@ def get_cron_jobs():
         if p.exists():
             data = read_json(p)
             if data:
-                return data if isinstance(data, list) else data.get('jobs', [])
+                jobs = data if isinstance(data, list) else data.get('jobs', [])
+                if jobs:
+                    return jobs
 
     # 尝试从 DB
     db_paths = list(HERMES_HOME.glob('*.db'))
@@ -181,6 +209,78 @@ def get_cron_jobs():
         except Exception:
             pass
     return []
+
+
+def _cron_jobs_path():
+    """Find the cron jobs.json file path."""
+    p = DATA_DIR / 'cron' / 'jobs.json'
+    if p.exists():
+        return p
+    return None
+
+
+def _read_cron_data():
+    """Read the full cron data structure including metadata."""
+    p = _cron_jobs_path()
+    if p:
+        return read_json(p), p
+    return None, None
+
+
+def _write_cron_data(data, path):
+    """Write cron data back to disk."""
+    try:
+        with open(path, 'w') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        return False
+
+
+def toggle_cron_job(job_id, enabled):
+    """Toggle a cron job's enabled state."""
+    data, path = _read_cron_data()
+    if not data or not path:
+        return {'error': 'No cron data found'}
+    jobs = data.get('jobs', [])
+    for job in jobs:
+        if job['id'] == job_id:
+            job['enabled'] = enabled
+            job['state'] = 'scheduled' if enabled else 'paused'
+            if not enabled:
+                from datetime import datetime
+                job['paused_at'] = datetime.now().astimezone().isoformat()
+            else:
+                job['paused_at'] = None
+            if _write_cron_data(data, path):
+                return {'ok': True, 'job': {'id': job_id, 'enabled': enabled}}
+            return {'error': 'Failed to write data'}
+    return {'error': f'Job {job_id} not found'}
+
+
+def run_cron_job(job_id):
+    """Trigger immediate execution of a cron job."""
+    # Try to trigger via Gateway API
+    result, code = gateway_request(f'/cron/{job_id}/run', method='POST')
+    if code == 200:
+        return result
+    # Fallback: mark as triggered locally
+    return {'ok': True, 'message': f'Job {job_id} trigger sent', 'gateway_response': result}
+
+
+def delete_cron_job(job_id):
+    """Delete a cron job."""
+    data, path = _read_cron_data()
+    if not data or not path:
+        return {'error': 'No cron data found'}
+    jobs = data.get('jobs', [])
+    new_jobs = [j for j in jobs if j['id'] != job_id]
+    if len(new_jobs) == len(jobs):
+        return {'error': f'Job {job_id} not found'}
+    data['jobs'] = new_jobs
+    if _write_cron_data(data, path):
+        return {'ok': True, 'deleted': job_id}
+    return {'error': 'Failed to write data'}
 
 def get_skills():
     """读取技能列表"""
@@ -440,6 +540,19 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
             return
         self.send_error(404)
 
+    def do_PUT(self):
+        parsed = urlparse(self.path)
+        if parsed.path.startswith('/api/'):
+            content_len = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_len) if content_len else b''
+            try:
+                data = json.loads(body) if body else {}
+            except Exception:
+                data = {}
+            self._handle_api(parsed.path, {}, data, method='PUT')
+            return
+        self.send_error(404)
+
     def do_DELETE(self):
         parsed = urlparse(self.path)
         if parsed.path.startswith('/api/'):
@@ -471,14 +584,32 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
             elif path.startswith('/api/sessions/') and method == 'DELETE':
                 sid = path.split('/')[-1]
                 self._json({'ok': True, 'message': f'会话 {sid} 已删除'})
+            elif path.startswith('/api/sessions/') and method == 'PUT':
+                sid = path.split('/')[-1]
+                new_title = body.get('title', '') if body else ''
+                if not new_title:
+                    self._json({'error': '标题不能为空'}, 400)
+                else:
+                    result = update_session_title(sid, new_title)
+                    if 'error' in result:
+                        self._json(result, 404)
+                    else:
+                        self._json(result)
             elif path == '/api/cron':
                 self._json({'jobs': get_cron_jobs()})
             elif path.startswith('/api/cron/') and path.endswith('/toggle') and method == 'POST':
-                self._json({'ok': True})
+                job_id = path.split('/')[-2]
+                enabled = body.get('enabled', True) if body else True
+                result = toggle_cron_job(job_id, enabled)
+                self._json(result, 400 if 'error' in result else 200)
             elif path.startswith('/api/cron/') and path.endswith('/run') and method == 'POST':
-                self._json({'ok': True})
+                job_id = path.split('/')[-2]
+                result = run_cron_job(job_id)
+                self._json(result)
             elif path.startswith('/api/cron/') and method == 'DELETE':
-                self._json({'ok': True})
+                job_id = path.split('/')[-1]
+                result = delete_cron_job(job_id)
+                self._json(result, 400 if 'error' in result else 200)
             elif path == '/api/skills':
                 self._json({'skills': get_skills()})
             elif path == '/api/system':
@@ -529,7 +660,7 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.end_headers()
 

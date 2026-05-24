@@ -84,6 +84,14 @@ const HermesAPI = {
     return this.proxy(`/sessions/${id}`, { method: 'DELETE' });
   },
 
+  /** 更新会话标题 */
+  async updateSession(id, title) {
+    return this.proxy(`/sessions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title }),
+    });
+  },
+
   /** 获取定时任务 */
   async getCronJobs() {
     return this.proxy('/cron');

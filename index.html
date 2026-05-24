@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hermes 控制台</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-sans/style.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-mono/style.min.css">
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/main.css?v=2">
+  <link rel="stylesheet" href="css/main.css?v=4">
 </head>
 <body>
-  <div id="app">
+  <div id="app" v-cloak>
     <!-- 主布局 -->
     <div class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- 移动端顶部栏 -->
@@ -101,7 +103,9 @@
             <!-- 状态卡片 -->
             <div class="stat-grid">
               <div class="stat-card" v-for="stat in dashboardStats" :key="stat.label">
-                <div class="stat-icon">{{ stat.icon }}</div>
+                <div class="stat-icon-wrap" :style="{ background: stat.iconBg }">
+                  <span class="stat-icon">{{ stat.icon }}</span>
+                </div>
                 <div class="stat-info">
                   <div class="stat-value">{{ stat.value }}</div>
                   <div class="stat-label">{{ stat.label }}</div>
@@ -122,28 +126,42 @@
             <!-- 底部信息 -->
             <div class="info-grid">
               <div class="info-card">
-                <h3>已配置模型</h3>
+                <div class="info-card-header">
+                  <h3>已配置模型</h3>
+                  <span class="info-count">{{ configModels.length }}</span>
+                </div>
                 <div class="info-list">
                   <div v-for="m in configModels" :key="m" class="info-item">
-                    <span class="item-dot dot-blue"></span>{{ m }}
+                    <span class="item-dot dot-blue"></span>
+                    <span class="info-item-text">{{ m }}</span>
                   </div>
                   <div v-if="!configModels.length" class="info-empty">暂无配置</div>
                 </div>
               </div>
               <div class="info-card">
-                <h3>连接渠道</h3>
+                <div class="info-card-header">
+                  <h3>连接渠道</h3>
+                  <span class="info-count">{{ gatewayAdapters.length }}</span>
+                </div>
                 <div class="info-list">
-                  <div v-for="a in gatewayAdapters" :key="a.name" class="info-item">
-                    <span class="item-dot" :class="a.connected ? 'dot-green' : 'dot-gray'"></span>
-                    {{ a.name }}
+                  <div v-for="a in gatewayAdapters" :key="a.name" class="info-item channel-item">
+                    <span class="channel-mini-icon">{{ getChannelIcon(a.name) }}</span>
+                    <span class="info-item-text">{{ getChannelLabel(a.name) }}</span>
+                    <span class="channel-status-badge" :class="a.connected ? 'status-connected' : 'status-disconnected'">
+                      {{ a.connected ? '已连接' : '未连接' }}
+                    </span>
                   </div>
                   <div v-if="!gatewayAdapters.length" class="info-empty">暂无连接</div>
                 </div>
               </div>
               <div class="info-card">
-                <h3>最近日志</h3>
+                <div class="info-card-header">
+                  <h3>最近日志</h3>
+                  <button @click="navigate('logs')" class="info-link">查看全部 →</button>
+                </div>
                 <div class="log-preview">
                   <div v-for="(log, i) in recentLogs" :key="i" class="log-line" :class="'log-' + log.level">
+                    <span class="log-level-badge" :class="'level-' + (log.level || 'info').toLowerCase()">{{ (log.level || 'INFO').slice(0, 4) }}</span>
                     <span class="log-time">{{ log.time }}</span>
                     <span class="log-msg">{{ log.msg }}</span>
                   </div>
@@ -159,7 +177,8 @@
             <div v-if="selectedSession" class="session-detail">
               <div class="page-toolbar">
                 <button @click="selectedSession = null" class="btn-ghost">← 返回列表</button>
-                <span class="session-title">{{ selectedSession.id }}</span>
+                <span class="session-title">{{ sessionDetailTitle || selectedSession }}</span>
+                <span class="toolbar-count" v-if="sessionTotal">{{ sessionMessages.length }} / {{ sessionTotal }} 条消息</span>
                 <button @click="refreshSessionDetail" class="btn-ghost">刷新</button>
               </div>
               <div class="message-list" ref="messageList">
@@ -184,6 +203,7 @@
             <div v-else>
               <div class="page-toolbar">
                 <input v-model="sessionSearch" type="text" placeholder="搜索会话..." class="search-input">
+                <span class="toolbar-count">{{ filteredSessions.length }} 个会话</span>
                 <button @click="loadSessions" class="btn-ghost">刷新</button>
               </div>
               <div class="table-container">
@@ -198,14 +218,25 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="s in filteredSessions" :key="s.id" @click="openSessionDetail(s.id)" class="clickable-row">
-                      <td data-label="ID" class="mono-text">{{ s.id.slice(0, 12) }}...</td>
-                      <td data-label="标题">{{ s.title || '未命名' }}</td>
+                    <tr v-for="s in paginatedSessions" :key="s.id" @click="editingSessionId !== s.id && openSessionDetail(s.id)" class="clickable-row">
+                      <td data-label="ID" class="mono-text" :title="s.id">{{ s.id }}</td>
+                      <td data-label="标题">
+                        <template v-if="editingSessionId === s.id">
+                          <div class="inline-edit">
+                            <input v-model="editingSessionTitle" class="editing-input" type="text"
+                                   @keyup.enter="saveEditSession(s.id)" @keyup.escape="cancelEditSession" @click.stop>
+                            <button class="btn-icon btn-save" @click.stop="saveEditSession(s.id)" title="保存">✓</button>
+                            <button class="btn-icon btn-cancel" @click.stop="cancelEditSession" title="取消">✕</button>
+                          </div>
+                        </template>
+                        <template v-else>{{ s.title || '未命名' }}</template>
+                      </td>
                       <td data-label="来源"><span class="badge">{{ s.source || 'cli' }}</span></td>
                       <td data-label="活跃">{{ formatTime(s.updated_at) }}</td>
                       <td data-label="操作">
+                        <button class="btn-sm" @click.stop="startEditSession(s)" title="编辑标题">✏️</button>
                         <button class="btn-sm" @click.stop="openSessionDetail(s.id)">查看</button>
-                        <button class="btn-sm btn-danger" @click.stop="deleteSession(s.id)">删除</button>
+                        <button class="btn-sm btn-danger" @click.stop="confirmDeleteSession(s.id, s.title || '未命名')">删除</button>
                       </td>
                     </tr>
                   </tbody>
@@ -215,35 +246,66 @@
                   <p>暂无会话数据</p>
                 </div>
               </div>
+              <!-- 分页 -->
+              <div v-if="totalSessionPages > 1" class="pagination">
+                <button class="btn-sm" :disabled="sessionPage <= 1" @click="sessionPage--">← 上一页</button>
+                <span class="page-info">{{ sessionPage }} / {{ totalSessionPages }}</span>
+                <button class="btn-sm" :disabled="sessionPage >= totalSessionPages" @click="sessionPage++">下一页 →</button>
+              </div>
             </div>
           </div>
 
           <!-- 定时任务 -->
           <div v-else-if="currentPage === 'cron'" class="page-cron">
             <div class="page-toolbar">
+              <span class="toolbar-count">{{ cronJobs.length }} 个任务</span>
               <button @click="loadCronJobs" class="btn-ghost">刷新</button>
             </div>
             <div class="card-list">
               <div v-for="job in cronJobs" :key="job.id" class="cron-card">
                 <div class="cron-header">
-                  <span class="cron-name">{{ job.name || job.id }}</span>
+                  <div class="cron-title-row">
+                    <span class="cron-name">{{ job.name || job.id }}</span>
+                    <span class="cron-id mono-text">{{ job.id }}</span>
+                  </div>
                   <span class="badge" :class="job.enabled ? 'badge-green' : 'badge-gray'">
                     {{ job.enabled ? '已启用' : '已暂停' }}
                   </span>
                 </div>
                 <div class="cron-detail">
-                  <span>📅 {{ job.schedule }}</span>
-                  <span>📝 {{ (job.prompt || '').slice(0, 50) }}{{ (job.prompt || '').length > 50 ? '...' : '' }}</span>
+                  <span class="cron-schedule">📅 {{ job.schedule_display || job.schedule?.display || job.schedule || '未设置' }}</span>
+                  <span class="cron-prompt" v-if="job.prompt">📝 {{ job.prompt.slice(0, 80) }}{{ job.prompt.length > 80 ? '...' : '' }}</span>
+                  <div class="cron-meta">
+                    <span v-if="job.last_run_at" class="cron-meta-item">
+                      <span class="meta-label">上次执行:</span> {{ formatTime(job.last_run_at) }}
+                      <span v-if="job.last_status" class="badge badge-xs" :class="job.last_status === 'ok' ? 'badge-green' : 'badge-red'">
+                        {{ job.last_status === 'ok' ? '成功' : '失败' }}
+                      </span>
+                    </span>
+                    <span v-if="job.next_run_at" class="cron-meta-item">
+                      <span class="meta-label">下次执行:</span> {{ formatTime(job.next_run_at) }}
+                    </span>
+                    <span v-if="job.last_error" class="cron-meta-item cron-error" :title="job.last_error">
+                      ⚠️ {{ job.last_error.slice(0, 60) }}{{ job.last_error.length > 60 ? '...' : '' }}
+                    </span>
+                    <span v-if="job.deliver" class="cron-meta-item">
+                      <span class="meta-label">投递至:</span> {{ getChannelLabel(job.deliver) }}
+                    </span>
+                  </div>
                 </div>
                 <div class="cron-actions">
-                  <button class="btn-sm" @click="toggleCron(job)">{{ job.enabled ? '暂停' : '启用' }}</button>
-                  <button class="btn-sm btn-primary" @click="runCron(job.id)">立即执行</button>
-                  <button class="btn-sm btn-danger" @click="deleteCron(job.id)">删除</button>
+                  <button class="btn-sm" @click="toggleCron(job)">{{ job.enabled ? '⏸ 暂停' : '▶ 启用' }}</button>
+                  <button class="btn-sm btn-primary" @click="runCron(job.id)">⚡ 立即执行</button>
+                  <button class="btn-sm btn-danger" @click="confirmDeleteCron(job)">🗑 删除</button>
                 </div>
               </div>
-              <div v-if="!cronJobs.length" class="empty-state">
+              <div v-if="!cronJobs.length" class="empty-state empty-state-rich">
                 <div class="empty-icon">⏰</div>
-                <p>暂无定时任务</p>
+                <h3>暂无定时任务</h3>
+                <p>定时任务通过飞书等渠道创建，让 Hermes 自动执行周期性工作。</p>
+                <div class="empty-hint">
+                  <span>💡 示例：每日摘要、定期监控、自动报告</span>
+                </div>
               </div>
             </div>
           </div>

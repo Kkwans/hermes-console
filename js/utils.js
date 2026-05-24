@@ -68,12 +68,31 @@ const Utils = {
       feishu: '🐦', email: '📧', signal: '🔒', matrix: '🔗',
       webchat: '🌐', api: '⚡', webhook: '🪝', sms: '📲',
       dingtalk: '🔔', wecom: '🏢', mattermost: '🐘',
+      lark: '🐦', wechat: '💚', cli: '⌨️', web: '🌐',
     };
     const lower = (name || '').toLowerCase();
     for (const [key, icon] of Object.entries(icons)) {
       if (lower.includes(key)) return icon;
     }
     return '📡';
+  },
+
+  /**
+   * 渠道中文名映射
+   */
+  getChannelLabel(name) {
+    const labels = {
+      telegram: 'Telegram', discord: 'Discord', slack: 'Slack', whatsapp: 'WhatsApp',
+      feishu: '飞书', lark: '飞书', email: '邮件', signal: 'Signal',
+      matrix: 'Matrix', webchat: '网页聊天', api: 'API', webhook: 'Webhook',
+      sms: '短信', dingtalk: '钉钉', wecom: '企业微信', mattermost: 'Mattermost',
+      wechat: '微信', cli: 'CLI', web: 'Web',
+    };
+    const lower = (name || '').toLowerCase();
+    for (const [key, label] of Object.entries(labels)) {
+      if (lower.includes(key)) return label;
+    }
+    return name;
   },
 
   /**

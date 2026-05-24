@@ -30,6 +30,14 @@ const app = createApp({
     const selectedSession = ref(null);
     const sessionMessages = ref([]);
     const sessionLoading = ref(false);
+    const sessionTotal = ref(0);
+    const sessionDetailTitle = ref("");
+    const sessionPage = ref(1);
+    const sessionPageSize = 20;
+
+    // Session editing
+    const editingSessionId = ref(null);
+    const editingSessionTitle = ref('');
 
     // Cron
     const cronJobs = ref([]);
@@ -109,7 +117,7 @@ const app = createApp({
 
     // 官方控制台地址
     const officialConsoleUrl = computed(() => {
-      return 'http://192.168.5.110:9999/';
+      return 'http://192.168.5.110:19119/login';
     });
 
     // ===== Toast =====
@@ -130,11 +138,11 @@ const app = createApp({
     function applyTheme(dark) {
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       // Update ECharts theme
-      const textColor = dark ? '#8a8f98' : '#6b7280';
-      const splitColor = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
-      const tooltipBg = dark ? '#191a1b' : '#ffffff';
-      const tooltipBorder = dark ? '#23252a' : '#e5e7eb';
-      const tooltipText = dark ? '#f7f8f8' : '#1a1d23';
+      const textColor = dark ? '#a1a1a1' : '#666666';
+      const splitColor = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+      const tooltipBg = dark ? '#171717' : '#ffffff';
+      const tooltipBorder = dark ? '#2a2a2a' : '#ebebeb';
+      const tooltipText = dark ? '#ededed' : '#171717';
       [cpuChartInst, memChartInst, monitorChartInst].forEach(c => {
         if (!c) return;
         c.setOption({
@@ -224,6 +232,47 @@ const app = createApp({
       }
     }
 
+    function confirmDeleteSession(id, title) {
+      const sessionTitle = title || '未命名会话';
+      confirmIcon.value = '🗑️';
+      confirmTitle.value = '删除会话';
+      confirmMsg.value = `确认要删除会话「${sessionTitle}」吗？此操作不可撤销。`;
+      confirmAction = () => deleteSession(id);
+      showConfirm.value = true;
+    }
+
+    function startEditSession(session) {
+      editingSessionId.value = session.id;
+      editingSessionTitle.value = session.title || '';
+      nextTick(() => {
+        const input = document.querySelector('.editing-input');
+        if (input) input.focus();
+      });
+    }
+
+    function cancelEditSession() {
+      editingSessionId.value = null;
+      editingSessionTitle.value = '';
+    }
+
+    async function saveEditSession(id) {
+      const newTitle = editingSessionTitle.value.trim();
+      if (!newTitle) {
+        toast('标题不能为空', 'error');
+        return;
+      }
+      try {
+        await HermesAPI.updateSession(id, newTitle);
+        // Update local data
+        const session = sessions.value.find(s => s.id === id);
+        if (session) session.title = newTitle;
+        toast('标题已更新', 'success');
+        cancelEditSession();
+      } catch (err) {
+        toast('更新失败: ' + err.message, 'error');
+      }
+    }
+
     async function openSessionDetail(id) {
       selectedSession.value = id;
       sessionLoading.value = true;
@@ -231,6 +280,8 @@ const app = createApp({
       try {
         const data = await HermesAPI.getSessionDetail(id);
         sessionMessages.value = data.messages || [];
+        sessionTotal.value = data.total || 0;
+        sessionDetailTitle.value = data.title || "";
       } catch (err) {
         console.error('加载会话详情失败:', err);
         toast('加载会话详情失败', 'error');
@@ -283,6 +334,15 @@ const app = createApp({
       }
     }
 
+    function confirmDeleteCron(job) {
+      const jobName = job.name || job.id;
+      confirmIcon.value = '🗑️';
+      confirmTitle.value = '删除定时任务';
+      confirmMsg.value = `确认要删除定时任务「${jobName}」吗？此操作不可撤销。`;
+      confirmAction = () => deleteCron(job.id);
+      showConfirm.value = true;
+    }
+
     async function loadSkills() {
       try {
         const data = await HermesAPI.getSkills();
@@ -328,10 +388,10 @@ const app = createApp({
     async function loadDashboardStats() {
       await Promise.all([loadGatewayStatus(), loadSystemInfo(), loadLogs()]);
       dashboardStats.value = [
-        { icon: '🟢', label: 'Gateway 状态', value: gatewayRunning.value ? '运行中' : '已停止' },
-        { icon: '💬', label: '活跃会话', value: sessions.value.length || '—' },
-        { icon: '⏰', label: '定时任务', value: cronJobs.value.length || '—' },
-        { icon: '🧩', label: '已安装技能', value: skills.value.length || '—' },
+        { icon: '⚡', label: 'Gateway 状态', value: gatewayRunning.value ? '运行中' : '已停止', iconBg: gatewayRunning.value ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' },
+        { icon: '💬', label: '活跃会话', value: sessions.value.length || '0', iconBg: 'rgba(59,130,246,0.1)' },
+        { icon: '⏰', label: '定时任务', value: cronJobs.value.length || '0', iconBg: 'rgba(245,158,11,0.1)' },
+        { icon: '🧩', label: '已安装技能', value: skills.value.length || '0', iconBg: 'rgba(139,92,246,0.1)' },
       ];
     }
 
@@ -408,11 +468,11 @@ const app = createApp({
     function getChartColors() {
       const dark = isDarkTheme.value;
       return {
-        textColor: dark ? '#8a8f98' : '#6b7280',
-        splitColor: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
-        tooltipBg: dark ? '#191a1b' : '#ffffff',
-        tooltipBorder: dark ? '#23252a' : '#e5e7eb',
-        tooltipText: dark ? '#f7f8f8' : '#1a1d23',
+        textColor: dark ? '#a1a1a1' : '#666666',
+        splitColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+        tooltipBg: dark ? '#171717' : '#ffffff',
+        tooltipBorder: dark ? '#2a2a2a' : '#ebebeb',
+        tooltipText: dark ? '#ededed' : '#171717',
       };
     }
 
@@ -465,9 +525,9 @@ const app = createApp({
           ...makeChartOpt(),
           series: [{
             type: 'line', data: [], smooth: true,
-            lineStyle: { color: '#5e6ad2', width: 2 },
-            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(94,106,210,0.3)' }, { offset: 1, color: 'rgba(94,106,210,0)' }] } },
-            itemStyle: { color: '#5e6ad2' },
+            lineStyle: { color: '#3b82f6', width: 2 },
+            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } },
+            itemStyle: { color: '#3b82f6' },
           }],
         });
       }
@@ -491,9 +551,9 @@ const app = createApp({
         monitorChartInst.setOption({
           ...makeChartOpt(),
           grid: { top: 30, right: 20, bottom: 30, left: 40 },
-          legend: { data: ['CPU', '内存'], textStyle: { color: '#8a8f98' }, top: 0 },
+          legend: { data: ['CPU', '内存'], textStyle: { color: '#a1a1a1' }, top: 0 },
           series: [
-            { name: 'CPU', type: 'line', data: [], smooth: true, lineStyle: { color: '#5e6ad2', width: 2 }, itemStyle: { color: '#5e6ad2' } },
+            { name: 'CPU', type: 'line', data: [], smooth: true, lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' } },
             { name: '内存', type: 'line', data: [], smooth: true, lineStyle: { color: '#10b981', width: 2 }, itemStyle: { color: '#10b981' } },
           ],
         });
@@ -528,6 +588,12 @@ const app = createApp({
         (s.id || '').toLowerCase().includes(q) ||
         (s.source || '').toLowerCase().includes(q)
       );
+    });
+
+    const totalSessionPages = computed(() => Math.ceil(filteredSessions.value.length / sessionPageSize));
+    const paginatedSessions = computed(() => {
+      const start = (sessionPage.value - 1) * sessionPageSize;
+      return filteredSessions.value.slice(start, start + sessionPageSize);
     });
 
     const filteredSkills = computed(() => {
@@ -645,9 +711,11 @@ const app = createApp({
       gatewayRunning, gatewayAdapters,
       dashboardStats, configModels, recentLogs,
       cpuChartEl, memChartEl,
-      sessions, sessionSearch, filteredSessions, loadSessions, deleteSession,
-      selectedSession, sessionMessages, sessionLoading, openSessionDetail, refreshSessionDetail,
-      cronJobs, loadCronJobs, toggleCron, runCron, deleteCron,
+      sessions, sessionSearch, filteredSessions, loadSessions, deleteSession, confirmDeleteSession,
+      editingSessionId, editingSessionTitle, startEditSession, saveEditSession, cancelEditSession,
+      sessionPage, totalSessionPages, paginatedSessions,
+      selectedSession, sessionMessages, sessionLoading, sessionTotal, sessionDetailTitle, openSessionDetail, refreshSessionDetail,
+      cronJobs, loadCronJobs, toggleCron, runCron, deleteCron, confirmDeleteCron,
       skills, skillSearch, filteredSkills, loadSkills,
       appConfig, switchForm, switchResult, switchModel,
       editableConfig, saveSettings, loadConfig,
@@ -661,6 +729,7 @@ const app = createApp({
       maskKey: Utils.maskKey,
       describeCron: Utils.describeCron,
       getChannelIcon: Utils.getChannelIcon,
+      getChannelLabel: Utils.getChannelLabel,
       getBarColor: Utils.getBarColor,
       officialConsoleUrl,
       confirmRestartGateway, startGateway,
