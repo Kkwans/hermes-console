@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes 控制台</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/main.css?v=2">
+</head>
+<body>
+  <div id="app">
+    <!-- Token 配置弹窗 -->
+    <div v-if="showSetup" class="setup-overlay">
+      <div class="setup-modal">
+        <div class="setup-icon">🔑</div>
+        <h2>连接到 Hermes Gateway</h2>
+        <p class="setup-desc">请输入 Gateway 内部 API Token 以开始使用控制台</p>
+        <div class="setup-form">
+          <label>Gateway 地址</label>
+          <input v-model="setupHost" type="text" placeholder="http://localhost:8080" class="setup-input">
+          <label>内部 Token</label>
+          <input v-model="setupToken" type="password" placeholder="输入 GATEWAY_INTERNAL_TOKEN" class="setup-input">
+          <p v-if="setupError" class="setup-error">{{ setupError }}</p>
+          <button @click="doSetup" class="btn-primary" :disabled="setupLoading">
+            {{ setupLoading ? '连接中...' : '连接' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主布局 -->
+    <div v-else class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <!-- 移动端顶部栏 -->
+      <header class="mobile-header">
+        <button @click="mobileMenuOpen = !mobileMenuOpen" class="mobile-menu-btn">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <rect y="3" width="20" height="2" rx="1"/>
+            <rect y="9" width="20" height="2" rx="1"/>
+            <rect y="15" width="20" height="2" rx="1"/>
+          </svg>
+        </button>
+        <span class="mobile-title">Hermes 控制台</span>
+        <div class="mobile-status" :class="gatewayRunning ? 'status-on' : 'status-off'"></div>
+      </header>
+
+      <!-- 侧边栏 -->
+      <aside class="sidebar" :class="{ open: mobileMenuOpen }">
+        <div class="sidebar-header">
+          <div class="logo-area">
+            <span class="logo-icon">⚡</span>
+            <span class="logo-text" v-show="!sidebarCollapsed">Hermes</span>
+          </div>
+          <button @click="sidebarCollapsed = !sidebarCollapsed" class="collapse-btn desktop-only">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path v-if="sidebarCollapsed" d="M6 2l6 6-6 6" stroke="currentColor" stroke-width="1.5" fill="none"/>
+              <path v-else d="M10 2l-6 6 6 6" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            </svg>
+          </button>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a v-for="item in menuItems" :key="item.path"
+             :class="{ active: currentPage === item.path }"
+             @click="navigate(item.path); mobileMenuOpen = false"
+             class="nav-item">
+            <span class="nav-icon">{{ item.icon }}</span>
+            <span class="nav-label" v-show="!sidebarCollapsed">{{ item.label }}</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="gateway-control" v-show="!sidebarCollapsed">
+            <div class="gateway-status">
+              <div class="status-dot" :class="gatewayRunning ? 'dot-on' : 'dot-off'"></div>
+              <span>{{ gatewayRunning ? 'Gateway 运行中' : 'Gateway 已停止' }}</span>
+            </div>
+            <div class="gateway-actions">
+              <button v-if="gatewayRunning" @click="confirmRestartGateway" class="btn-sm btn-warn" title="重启 Gateway">
+                🔄 重启
+              </button>
+              <button v-else @click="startGateway" class="btn-sm btn-primary" title="启动 Gateway">
+                ▶️ 启动
+              </button>
+            </div>
+          </div>
+          <div class="gateway-status" v-show="sidebarCollapsed">
+            <div class="status-dot" :class="gatewayRunning ? 'dot-on' : 'dot-off'" :title="gatewayRunning ? '运行中' : '已停止'"></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 遮罩层 (移动端) -->
+      <div v-if="mobileMenuOpen" class="mobile-overlay" @click="mobileMenuOpen = false"></div>
+
+      <!-- 主内容区 -->
+      <main class="main-content">
+        <header class="topbar">
+          <h1 class="page-title">{{ currentPageTitle }}</h1>
+          <div class="topbar-actions">
+            <a :href="officialConsoleUrl" target="_blank" class="btn-ghost" title="打开官方控制台">
+              🌐 官方控制台
+            </a>
+            <button @click="refreshData" class="btn-ghost" title="刷新数据">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24L10 6h6V0l-2.35 2.35z"/>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="content-area">
+          <!-- 仪表盘 -->
+          <div v-if="currentPage === 'dashboard'" class="page-dashboard">
+            <!-- 状态卡片 -->
+            <div class="stat-grid">
+              <div class="stat-card" v-for="stat in dashboardStats" :key="stat.label">
+                <div class="stat-icon">{{ stat.icon }}</div>
+                <div class="stat-info">
+                  <div class="stat-value">{{ stat.value }}</div>
+                  <div class="stat-label">{{ stat.label }}</div>
+                </div>
+              </div>
+            </div>
+            <!-- 图表区域 -->
+            <div class="chart-grid">
+              <div class="chart-card">
+                <h3>CPU 使用率</h3>
+                <div ref="cpuChartEl" class="chart-container"></div>
+              </div>
+              <div class="chart-card">
+                <h3>内存使用率</h3>
+                <div ref="memChartEl" class="chart-container"></div>
+              </div>
+            </div>
+            <!-- 底部信息 -->
+            <div class="info-grid">
+              <div class="info-card">
+                <h3>已配置模型</h3>
+                <div class="info-list">
+                  <div v-for="m in configModels" :key="m" class="info-item">
+                    <span class="item-dot dot-blue"></span>{{ m }}
+                  </div>
+                  <div v-if="!configModels.length" class="info-empty">暂无配置</div>
+                </div>
+              </div>
+              <div class="info-card">
+                <h3>连接渠道</h3>
+                <div class="info-list">
+                  <div v-for="a in gatewayAdapters" :key="a.name" class="info-item">
+                    <span class="item-dot" :class="a.connected ? 'dot-green' : 'dot-gray'"></span>
+                    {{ a.name }}
+                  </div>
+                  <div v-if="!gatewayAdapters.length" class="info-empty">暂无连接</div>
+                </div>
+              </div>
+              <div class="info-card">
+                <h3>最近日志</h3>
+                <div class="log-preview">
+                  <div v-for="(log, i) in recentLogs" :key="i" class="log-line" :class="'log-' + log.level">
+                    <span class="log-time">{{ log.time }}</span>
+                    <span class="log-msg">{{ log.msg }}</span>
+                  </div>
+                  <div v-if="!recentLogs.length" class="info-empty">暂无日志</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 会话管理 -->
+          <div v-else-if="currentPage === 'sessions'" class="page-sessions">
+            <div class="page-toolbar">
+              <input v-model="sessionSearch" type="text" placeholder="搜索会话..." class="search-input">
+              <button @click="loadSessions" class="btn-ghost">刷新</button>
+            </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>会话 ID</th>
+                    <th>标题</th>
+                    <th>来源</th>
+                    <th>最后活跃</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="s in filteredSessions" :key="s.id">
+                    <td class="mono-text">{{ s.id.slice(0, 12) }}...</td>
+                    <td>{{ s.title || '未命名' }}</td>
+                    <td><span class="badge">{{ s.source || 'cli' }}</span></td>
+                    <td>{{ formatTime(s.updated_at) }}</td>
+                    <td>
+                      <button class="btn-sm btn-danger" @click="deleteSession(s.id)">删除</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="!filteredSessions.length" class="empty-state">
+                <div class="empty-icon">💬</div>
+                <p>暂无会话数据</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 定时任务 -->
+          <div v-else-if="currentPage === 'cron'" class="page-cron">
+            <div class="page-toolbar">
+              <button @click="loadCronJobs" class="btn-ghost">刷新</button>
+            </div>
+            <div class="card-list">
+              <div v-for="job in cronJobs" :key="job.id" class="cron-card">
+                <div class="cron-header">
+                  <span class="cron-name">{{ job.name || job.id }}</span>
+                  <span class="badge" :class="job.enabled ? 'badge-green' : 'badge-gray'">
+                    {{ job.enabled ? '已启用' : '已暂停' }}
+                  </span>
+                </div>
+                <div class="cron-detail">
+                  <span>📅 {{ job.schedule }}</span>
+                  <span>📝 {{ (job.prompt || '').slice(0, 50) }}{{ (job.prompt || '').length > 50 ? '...' : '' }}</span>
+                </div>
+                <div class="cron-actions">
+                  <button class="btn-sm" @click="toggleCron(job)">{{ job.enabled ? '暂停' : '启用' }}</button>
+                  <button class="btn-sm btn-primary" @click="runCron(job.id)">立即执行</button>
+                  <button class="btn-sm btn-danger" @click="deleteCron(job.id)">删除</button>
+                </div>
+              </div>
+              <div v-if="!cronJobs.length" class="empty-state">
+                <div class="empty-icon">⏰</div>
+                <p>暂无定时任务</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 技能管理 -->
+          <div v-else-if="currentPage === 'skills'" class="page-skills">
+            <div class="page-toolbar">
+              <input v-model="skillSearch" type="text" placeholder="搜索技能..." class="search-input">
+              <button @click="loadSkills" class="btn-ghost">刷新</button>
+            </div>
+            <div class="card-grid">
+              <div v-for="skill in filteredSkills" :key="skill.name" class="skill-card">
+                <div class="skill-header">
+                  <span class="skill-name">{{ skill.name }}</span>
+                  <span class="badge badge-blue">{{ skill.category || '通用' }}</span>
+                </div>
+                <p class="skill-desc">{{ skill.description || '暂无描述' }}</p>
+                <div class="skill-meta">
+                  <span>v{{ skill.version || '1.0' }}</span>
+                  <span>{{ skill.author || '未知' }}</span>
+                </div>
+              </div>
+              <div v-if="!filteredSkills.length" class="empty-state">
+                <div class="empty-icon">🧩</div>
+                <p>暂无技能数据</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 模型配置 -->
+          <div v-else-if="currentPage === 'models'" class="page-models">
+            <div class="model-current">
+              <h3>当前模型</h3>
+              <div class="model-info-grid">
+                <div class="model-info-item">
+                  <span class="info-label">模型名称</span>
+                  <span class="info-value">{{ appConfig.model?.default || '未配置' }}</span>
+                </div>
+                <div class="model-info-item">
+                  <span class="info-label">提供商</span>
+                  <span class="info-value">{{ appConfig.model?.provider || '未配置' }}</span>
+                </div>
+                <div class="model-info-item">
+                  <span class="info-label">API 地址</span>
+                  <span class="info-value mono-text">{{ appConfig.model?.base_url || '未配置' }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="model-providers">
+              <h3>已配置提供商</h3>
+              <div class="card-grid">
+                <div v-for="(conf, name) in appConfig.providers || {}" :key="name" class="provider-card">
+                  <div class="provider-name">{{ name }}</div>
+                  <div class="provider-url mono-text">{{ conf.base_url || '默认地址' }}</div>
+                  <div class="provider-key mono-text">{{ maskKey(conf.api_key) }}</div>
+                </div>
+                <div v-if="!Object.keys(appConfig.providers || {}).length" class="empty-state">
+                  <p>暂无提供商配置</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 消息渠道 -->
+          <div v-else-if="currentPage === 'channels'" class="page-channels">
+            <div class="card-grid">
+              <div v-for="adapter in gatewayAdapters" :key="adapter.name" class="channel-card">
+                <div class="channel-icon">{{ getChannelIcon(adapter.name) }}</div>
+                <div class="channel-name">{{ adapter.name }}</div>
+                <div class="channel-status" :class="adapter.connected ? 'connected' : 'disconnected'">
+                  {{ adapter.connected ? '已连接' : '未连接' }}
+                </div>
+              </div>
+              <div v-if="!gatewayAdapters.length" class="empty-state">
+                <div class="empty-icon">📡</div>
+                <p>Gateway 未运行或暂无渠道连接</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 系统设置 -->
+          <div v-else-if="currentPage === 'settings'" class="page-settings">
+            <div class="settings-section">
+              <h3>🤖 智能体设置</h3>
+              <div class="setting-item">
+                <span class="setting-label">最大对话轮次</span>
+                <input v-model.number="editableConfig.agent.max_turns" type="number" class="setting-input">
+              </div>
+              <div class="setting-item">
+                <span class="setting-label">工具调用策略</span>
+                <select v-model="editableConfig.agent.tool_use_enforcement" class="setting-input">
+                  <option value="auto">自动</option>
+                  <option value="required">强制</option>
+                  <option value="none">禁用</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-section">
+              <h3>🎨 显示设置</h3>
+              <div class="setting-item">
+                <span class="setting-label">个性风格</span>
+                <select v-model="editableConfig.display.personality" class="setting-input">
+                  <option value="">默认</option>
+                  <option v-for="(p, name) in appConfig.agent?.personalities || {}" :key="name" :value="name">{{ name }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-actions">
+              <button @click="saveSettings" class="btn-primary">保存设置</button>
+              <button @click="loadConfig" class="btn-ghost">重置</button>
+            </div>
+          </div>
+
+          <!-- 日志查看 -->
+          <div v-else-if="currentPage === 'logs'" class="page-logs">
+            <div class="page-toolbar">
+              <select v-model="logLevel" class="filter-select">
+                <option value="">全部级别</option>
+                <option value="ERROR">ERROR</option>
+                <option value="WARN">WARN</option>
+                <option value="INFO">INFO</option>
+                <option value="DEBUG">DEBUG</option>
+              </select>
+              <input v-model="logSearch" type="text" placeholder="搜索日志..." class="search-input">
+              <label class="auto-scroll-label">
+                <input v-model="autoScroll" type="checkbox"> 自动滚动
+              </label>
+              <button @click="loadLogs" class="btn-ghost">刷新</button>
+            </div>
+            <div class="log-viewer" ref="logViewer">
+              <div v-for="(log, i) in filteredLogs" :key="i" class="log-entry" :class="'log-' + log.level.toLowerCase()">
+                <span class="log-time">{{ log.time }}</span>
+                <span class="log-level">{{ log.level }}</span>
+                <span class="log-message">{{ log.msg }}</span>
+              </div>
+              <div v-if="!filteredLogs.length" class="empty-state">
+                <p>暂无日志数据</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 系统监控 -->
+          <div v-else-if="currentPage === 'monitor'" class="page-monitor">
+            <div class="monitor-grid">
+              <div class="monitor-card">
+                <h3>CPU 使用率</h3>
+                <div class="monitor-value">{{ systemInfo.cpu_percent || 0 }}%</div>
+                <div class="monitor-bar">
+                  <div class="bar-fill" :style="{ width: (systemInfo.cpu_percent || 0) + '%' }" :class="getBarColor(systemInfo.cpu_percent)"></div>
+                </div>
+              </div>
+              <div class="monitor-card">
+                <h3>内存使用率</h3>
+                <div class="monitor-value">{{ systemInfo.mem_percent || 0 }}%</div>
+                <div class="monitor-bar">
+                  <div class="bar-fill" :style="{ width: (systemInfo.mem_percent || 0) + '%' }" :class="getBarColor(systemInfo.mem_percent)"></div>
+                </div>
+                <div class="monitor-detail">{{ systemInfo.mem_used || 0 }} / {{ systemInfo.mem_total || 0 }} GB</div>
+              </div>
+              <div class="monitor-card">
+                <h3>磁盘使用率</h3>
+                <div class="monitor-value">{{ systemInfo.disk_percent || 0 }}%</div>
+                <div class="monitor-bar">
+                  <div class="bar-fill" :style="{ width: (systemInfo.disk_percent || 0) + '%' }" :class="getBarColor(systemInfo.disk_percent)"></div>
+                </div>
+                <div class="monitor-detail">{{ systemInfo.disk_used || 0 }} / {{ systemInfo.disk_total || 0 }} GB</div>
+              </div>
+              <div class="monitor-card">
+                <h3>系统运行时间</h3>
+                <div class="monitor-value uptime">{{ systemInfo.uptime || '未知' }}</div>
+              </div>
+            </div>
+            <div class="chart-card" style="margin-top: 1.5rem;">
+              <h3>CPU / 内存趋势</h3>
+              <div ref="monitorChartEl" class="chart-container chart-lg"></div>
+            </div>
+          </div>
+
+          <!-- 插件管理 -->
+          <div v-else-if="currentPage === 'plugins'" class="page-plugins">
+            <div class="empty-state">
+              <div class="empty-icon">🔌</div>
+              <h3>插件管理</h3>
+              <p>插件管理功能开发中...</p>
+            </div>
+          </div>
+
+          <!-- 默认 404 -->
+          <div v-else class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <h3>页面不存在</h3>
+            <p>请从左侧菜单选择一个功能</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div v-if="showConfirm" class="confirm-overlay" @click.self="showConfirm = false">
+      <div class="confirm-modal">
+        <div class="confirm-icon">{{ confirmIcon }}</div>
+        <h3>{{ confirmTitle }}</h3>
+        <p>{{ confirmMsg }}</p>
+        <div class="confirm-actions">
+          <button @click="showConfirm = false" class="btn-ghost">取消</button>
+          <button @click="confirmAction(); showConfirm = false" class="btn-sm btn-primary">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div class="toast-container">
+      <div v-for="(t, i) in toasts" :key="i" class="toast" :class="'toast-' + t.type">
+        {{ t.msg }}
+      </div>
+    </div>
+  </div>
+
+  <script src="js/utils.js?v=2"></script>
+  <script src="js/api.js?v=2"></script>
+  <script src="js/app.js?v=2"></script>
+</body>
+</html>
