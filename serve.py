@@ -16,6 +16,8 @@ import sqlite3
 import socketserver
 import sys
 import signal
+import urllib.request
+import urllib.error
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
@@ -26,6 +28,11 @@ PORT = int(os.environ.get('CONSOLE_PORT', 8088))
 CONSOLE_DIR = Path(__file__).parent
 DATA_DIR = Path('/opt/data')
 HERMES_HOME = Path(os.environ.get('HERMES_HOME', '/opt/data'))
+
+# Gateway internal API config (auto-detected from environment)
+GATEWAY_INTERNAL_PORT = int(os.environ.get('GATEWAY_INTERNAL_PORT', 18643))
+GATEWAY_INTERNAL_TOKEN = os.environ.get('GATEWAY_INTERNAL_TOKEN', '')
+GATEWAY_API_BASE = f'http://127.0.0.1:{GATEWAY_INTERNAL_PORT}'
 
 # ---------- Helpers ----------
 
@@ -92,6 +99,59 @@ def get_sessions():
                     pass
 
     return sessions
+
+def get_session_detail(session_id):
+    """读取单个会话的消息历史"""
+    session_dir = HERMES_HOME / 'sessions'
+
+    # Try JSONL files first (most common format)
+    for f in session_dir.glob('*.jsonl'):
+        if session_id in f.stem:
+            messages = []
+            try:
+                for line in f.read_text(errors='replace').strip().split('\n'):
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        role = entry.get('role', '')
+                        content = entry.get('content', '')
+                        timestamp = entry.get('timestamp', '')
+                        if role in ('user', 'assistant') and content:
+                            # Truncate very long content for display
+                            if len(content) > 2000:
+                                content = content[:2000] + '...'
+                            messages.append({
+                                'role': role,
+                                'content': content,
+                                'timestamp': timestamp,
+                            })
+                    except json.JSONDecodeError:
+                        continue
+                return {
+                    'id': session_id,
+                    'messages': messages[-100:],  # Last 100 messages
+                    'total': len(messages),
+                }
+            except Exception as e:
+                return {'id': session_id, 'error': str(e), 'messages': []}
+
+    # Try JSON files
+    for f in session_dir.glob('*.json'):
+        if session_id in f.stem:
+            try:
+                data = json.loads(f.read_text())
+                return {
+                    'id': session_id,
+                    'title': data.get('title', ''),
+                    'messages': data.get('messages', [])[-100:],
+                    'total': len(data.get('messages', [])),
+                }
+            except Exception as e:
+                return {'id': session_id, 'error': str(e), 'messages': []}
+
+    return {'id': session_id, 'error': 'Session not found', 'messages': []}
+
 
 def get_cron_jobs():
     """读取定时任务"""
@@ -321,6 +381,29 @@ def get_logs(lines=200):
     return []
 
 
+# ---------- Gateway Proxy ----------
+
+def gateway_request(path, method='GET', body=None):
+    """Proxy a request to the Gateway internal API."""
+    url = f'{GATEWAY_API_BASE}{path}'
+    headers = {'Content-Type': 'application/json'}
+    if GATEWAY_INTERNAL_TOKEN:
+        headers['Authorization'] = f'Bearer {GATEWAY_INTERNAL_TOKEN}'
+    data = json.dumps(body).encode() if body else None
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode()), resp.status
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode(errors='replace')[:500]
+        try:
+            return json.loads(body_text), e.code
+        except:
+            return {'error': body_text}, e.code
+    except Exception as e:
+        return {'error': str(e)}, 502
+
+
 # ---------- HTTP Handler ----------
 
 class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
@@ -382,6 +465,9 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
                     self._json({'error': str(e)}, 500)
             elif path == '/api/sessions':
                 self._json({'sessions': get_sessions()})
+            elif path.startswith('/api/sessions/') and path.endswith('/messages'):
+                sid = path.split('/')[-2]
+                self._json(get_session_detail(sid))
             elif path.startswith('/api/sessions/') and method == 'DELETE':
                 sid = path.split('/')[-1]
                 self._json({'ok': True, 'message': f'会话 {sid} 已删除'})
@@ -402,6 +488,28 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
                 self._json({'logs': get_logs(lines)})
             elif path == '/api/plugins':
                 self._json({'plugins': get_plugins()})
+            elif path == '/api/gateway/status' and method == 'GET':
+                data, code = gateway_request('/status')
+                self._json(data, code)
+            elif path == '/api/gateway/restart' and method == 'POST':
+                data, code = gateway_request('/restart', method='POST')
+                self._json(data, code)
+            elif path == '/api/model/switch' and method == 'POST':
+                # Switch model by updating config.yaml
+                try:
+                    import yaml
+                    config_path = DATA_DIR / 'config.yaml'
+                    with open(config_path) as f:
+                        config = yaml.safe_load(f) or {}
+                    if 'model' not in config:
+                        config['model'] = {}
+                    config['model']['provider'] = body.get('provider', config['model'].get('provider', ''))
+                    config['model']['default'] = body.get('model', config['model'].get('default', ''))
+                    with open(config_path, 'w') as f:
+                        yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+                    self._json({'ok': True, 'provider': config['model']['provider'], 'model': config['model']['default']})
+                except Exception as e:
+                    self._json({'error': str(e)}, 500)
             elif path == '/api/memory':
                 self._json({'memory': []})
             else:

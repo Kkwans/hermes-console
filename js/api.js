@@ -1,22 +1,13 @@
 /**
  * api.js — Hermes API 通信层
  *
- * 通过 Python 后端代理获取数据（配置、会话、日志等）
- * 同时直接调用 Gateway 内部 API（状态、重启）
+ * 所有请求通过 Python 后端代理（同源），Gateway 内部 API 也由后端转发
+ * 浏览器不需要直接访问 Gateway，无 CORS 问题，无需手动输入 Token
  */
 
 const HermesAPI = {
-  // 后端代理地址（同源）
+  // 后端代理地址（同源，无需配置）
   proxyBase: '',
-  // Gateway 内部 API
-  gatewayHost: '',
-  gatewayToken: '',
-
-  init() {
-    const cfg = Utils.store.get('connection', {});
-    this.gatewayHost = cfg.host || '';
-    this.gatewayToken = cfg.token || '';
-  },
 
   /**
    * 通用 fetch 封装
@@ -48,34 +39,21 @@ const HermesAPI = {
     return this.fetch(`${this.proxyBase}/api${path}`, options);
   },
 
-  /**
-   * Gateway 内部 API 请求
-   */
-  async gateway(path, options = {}) {
-    return this.fetch(`${this.gatewayHost}/internal${path}`, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.gatewayToken}`,
-        ...(options.headers || {}),
-      },
-    });
-  },
-
   // ========== 业务方法 ==========
 
-  /** 测试连接 */
+  /** 测试连接 (通过后端代理) */
   async testConnection() {
-    return this.gateway('/status');
+    return this.proxy('/gateway/status');
   },
 
-  /** 获取 Gateway 状态 */
+  /** 获取 Gateway 状态 (通过后端代理) */
   async getStatus() {
-    return this.gateway('/status');
+    return this.proxy('/gateway/status');
   },
 
-  /** 重启 Gateway */
+  /** 重启 Gateway (通过后端代理) */
   async restartGateway() {
-    return this.gateway('/restart', { method: 'POST' });
+    return this.proxy('/gateway/restart', { method: 'POST' });
   },
 
   /** 获取配置 */
@@ -94,6 +72,11 @@ const HermesAPI = {
   /** 获取会话列表 */
   async getSessions() {
     return this.proxy('/sessions');
+  },
+
+  /** 获取会话详情和消息历史 */
+  async getSessionDetail(id) {
+    return this.proxy(`/sessions/${id}/messages`);
   },
 
   /** 删除会话 */
@@ -147,5 +130,13 @@ const HermesAPI = {
   /** 获取插件列表 */
   async getPlugins() {
     return this.proxy('/plugins');
+  },
+
+  /** 切换模型 */
+  async switchModel(provider, model) {
+    return this.proxy('/model/switch', {
+      method: 'POST',
+      body: JSON.stringify({ provider, model }),
+    });
   },
 };

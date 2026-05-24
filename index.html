@@ -12,27 +12,8 @@
 </head>
 <body>
   <div id="app">
-    <!-- Token 配置弹窗 -->
-    <div v-if="showSetup" class="setup-overlay">
-      <div class="setup-modal">
-        <div class="setup-icon">🔑</div>
-        <h2>连接到 Hermes Gateway</h2>
-        <p class="setup-desc">请输入 Gateway 内部 API Token 以开始使用控制台</p>
-        <div class="setup-form">
-          <label>Gateway 地址</label>
-          <input v-model="setupHost" type="text" placeholder="http://localhost:8080" class="setup-input">
-          <label>内部 Token</label>
-          <input v-model="setupToken" type="password" placeholder="输入 GATEWAY_INTERNAL_TOKEN" class="setup-input">
-          <p v-if="setupError" class="setup-error">{{ setupError }}</p>
-          <button @click="doSetup" class="btn-primary" :disabled="setupLoading">
-            {{ setupLoading ? '连接中...' : '连接' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- 主布局 -->
-    <div v-else class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <div class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- 移动端顶部栏 -->
       <header class="mobile-header">
         <button @click="mobileMenuOpen = !mobileMenuOpen" class="mobile-menu-btn">
@@ -174,36 +155,65 @@
 
           <!-- 会话管理 -->
           <div v-else-if="currentPage === 'sessions'" class="page-sessions">
-            <div class="page-toolbar">
-              <input v-model="sessionSearch" type="text" placeholder="搜索会话..." class="search-input">
-              <button @click="loadSessions" class="btn-ghost">刷新</button>
+            <!-- 会话详情视图 -->
+            <div v-if="selectedSession" class="session-detail">
+              <div class="page-toolbar">
+                <button @click="selectedSession = null" class="btn-ghost">← 返回列表</button>
+                <span class="session-title">{{ selectedSession.id }}</span>
+                <button @click="refreshSessionDetail" class="btn-ghost">刷新</button>
+              </div>
+              <div class="message-list" ref="messageList">
+                <div v-if="sessionLoading" class="empty-state">
+                  <p>加载中...</p>
+                </div>
+                <div v-else-if="!sessionMessages.length" class="empty-state">
+                  <div class="empty-icon">💬</div>
+                  <p>暂无消息记录</p>
+                </div>
+                <div v-else v-for="(msg, idx) in sessionMessages" :key="idx"
+                     class="message-item" :class="'msg-' + msg.role">
+                  <div class="msg-header">
+                    <span class="msg-role">{{ msg.role === 'user' ? '👤 用户' : '🤖 助手' }}</span>
+                    <span class="msg-time" v-if="msg.timestamp">{{ formatTime(msg.timestamp) }}</span>
+                  </div>
+                  <div class="msg-content">{{ msg.content }}</div>
+                </div>
+              </div>
             </div>
-            <div class="table-container">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>会话 ID</th>
-                    <th>标题</th>
-                    <th>来源</th>
-                    <th>最后活跃</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="s in filteredSessions" :key="s.id">
-                    <td data-label="ID" class="mono-text">{{ s.id.slice(0, 12) }}...</td>
-                    <td data-label="标题">{{ s.title || '未命名' }}</td>
-                    <td data-label="来源"><span class="badge">{{ s.source || 'cli' }}</span></td>
-                    <td data-label="活跃">{{ formatTime(s.updated_at) }}</td>
-                    <td data-label="操作">
-                      <button class="btn-sm btn-danger" @click="deleteSession(s.id)">删除</button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <div v-if="!filteredSessions.length" class="empty-state">
-                <div class="empty-icon">💬</div>
-                <p>暂无会话数据</p>
+            <!-- 会话列表视图 -->
+            <div v-else>
+              <div class="page-toolbar">
+                <input v-model="sessionSearch" type="text" placeholder="搜索会话..." class="search-input">
+                <button @click="loadSessions" class="btn-ghost">刷新</button>
+              </div>
+              <div class="table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>会话 ID</th>
+                      <th>标题</th>
+                      <th>来源</th>
+                      <th>最后活跃</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="s in filteredSessions" :key="s.id" @click="openSessionDetail(s.id)" class="clickable-row">
+                      <td data-label="ID" class="mono-text">{{ s.id.slice(0, 12) }}...</td>
+                      <td data-label="标题">{{ s.title || '未命名' }}</td>
+                      <td data-label="来源"><span class="badge">{{ s.source || 'cli' }}</span></td>
+                      <td data-label="活跃">{{ formatTime(s.updated_at) }}</td>
+                      <td data-label="操作">
+                        <button class="btn-sm" @click.stop="openSessionDetail(s.id)">查看</button>
+                        <button class="btn-sm btn-danger" @click.stop="deleteSession(s.id)">删除</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-if="!filteredSessions.length" class="empty-state">
+                  <div class="empty-icon">💬</div>
+                  <p>暂无会话数据</p>
+                </div>
               </div>
             </div>
           </div>
@@ -282,10 +292,32 @@
                 </div>
               </div>
             </div>
+            <div class="model-switch">
+              <h3>切换模型</h3>
+              <div class="model-switch-form">
+                <div class="form-group">
+                  <label>提供商</label>
+                  <select v-model="switchForm.provider" class="form-select">
+                    <option value="">选择提供商</option>
+                    <option v-for="(conf, name) in appConfig.providers || {}" :key="name" :value="name">{{ name }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>模型名称</label>
+                  <input v-model="switchForm.model" type="text" placeholder="例如: mimo-v2.5-pro" class="form-input">
+                </div>
+                <button @click="switchModel" class="btn-primary" :disabled="!switchForm.provider || !switchForm.model">
+                  切换模型
+                </button>
+                <span v-if="switchResult" class="switch-result" :class="switchResult.ok ? 'success' : 'error'">
+                  {{ switchResult.ok ? '✓ 切换成功' : '✗ ' + switchResult.error }}
+                </span>
+              </div>
+            </div>
             <div class="model-providers">
               <h3>已配置提供商</h3>
               <div class="card-grid">
-                <div v-for="(conf, name) in appConfig.providers || {}" :key="name" class="provider-card">
+                <div v-for="(conf, name) in appConfig.providers || {}" :key="name" class="provider-card" @click="switchForm.provider = name">
                   <div class="provider-name">{{ name }}</div>
                   <div class="provider-url mono-text">{{ conf.base_url || '默认地址' }}</div>
                   <div class="provider-key mono-text">{{ maskKey(conf.api_key) }}</div>

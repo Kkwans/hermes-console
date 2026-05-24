@@ -7,12 +7,6 @@ const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
 const app = createApp({
   setup() {
     // ===== State =====
-    const showSetup = ref(false);
-    const setupHost = ref('http://localhost:8080');
-    const setupToken = ref('');
-    const setupError = ref('');
-    const setupLoading = ref(false);
-
     const sidebarCollapsed = ref(Utils.store.get('sidebar_collapsed', false));
     const mobileMenuOpen = ref(false);
     const currentPage = ref(Utils.store.get('current_page', 'dashboard'));
@@ -33,6 +27,9 @@ const app = createApp({
     // Sessions
     const sessions = ref([]);
     const sessionSearch = ref('');
+    const selectedSession = ref(null);
+    const sessionMessages = ref([]);
+    const sessionLoading = ref(false);
 
     // Cron
     const cronJobs = ref([]);
@@ -44,6 +41,8 @@ const app = createApp({
     // Config
     const appConfig = ref({});
     const editableConfig = ref({ agent: {}, display: {} });
+    const switchForm = ref({ provider: '', model: '' });
+    const switchResult = ref(null);
 
     // Logs
     const logEntries = ref([]);
@@ -108,10 +107,9 @@ const app = createApp({
 
     const currentPageTitle = computed(() => pageTitleMap[currentPage.value] || '未知页面');
 
-    // 官方控制台地址（默认 Gateway HTTP 端口）
+    // 官方控制台地址
     const officialConsoleUrl = computed(() => {
-      const host = HermesAPI.gatewayHost || 'http://localhost:8080';
-      return host.replace(/\/internal.*$/, '').replace(/\/$/, '') + '/';
+      return 'http://192.168.5.110:9999/';
     });
 
     // ===== Toast =====
@@ -153,29 +151,6 @@ const app = createApp({
       applyTheme(isDarkTheme.value);
     }
 
-    // ===== Setup =====
-    async function doSetup() {
-      setupError.value = '';
-      setupLoading.value = true;
-      try {
-        HermesAPI.gatewayHost = setupHost.value.replace(/\/$/, '');
-        HermesAPI.gatewayToken = setupToken.value;
-        const status = await HermesAPI.testConnection();
-        Utils.store.set('connection', {
-          host: HermesAPI.gatewayHost,
-          token: HermesAPI.gatewayToken,
-        });
-        showSetup.value = false;
-        gatewayRunning.value = status.running !== false;
-        toast('连接成功！', 'success');
-        loadAll();
-      } catch (err) {
-        setupError.value = `连接失败: ${err.message}`;
-      } finally {
-        setupLoading.value = false;
-      }
-    }
-
     // ===== Data Loading =====
     async function loadGatewayStatus() {
       try {
@@ -212,6 +187,24 @@ const app = createApp({
       }
     }
 
+    async function switchModel() {
+      switchResult.value = null;
+      try {
+        const result = await HermesAPI.switchModel(switchForm.value.provider, switchForm.value.model);
+        if (result.ok) {
+          switchResult.value = { ok: true };
+          toast('模型已切换', 'success');
+          await loadConfig(); // Refresh config
+          switchForm.value = { provider: '', model: '' };
+        } else {
+          switchResult.value = { ok: false, error: result.error || '切换失败' };
+        }
+      } catch (err) {
+        switchResult.value = { ok: false, error: err.message };
+      }
+      setTimeout(() => switchResult.value = null, 3000);
+    }
+
     async function loadSessions() {
       try {
         const data = await HermesAPI.getSessions();
@@ -228,6 +221,27 @@ const app = createApp({
         toast('会话已删除', 'success');
       } catch (err) {
         toast('删除失败: ' + err.message, 'error');
+      }
+    }
+
+    async function openSessionDetail(id) {
+      selectedSession.value = id;
+      sessionLoading.value = true;
+      sessionMessages.value = [];
+      try {
+        const data = await HermesAPI.getSessionDetail(id);
+        sessionMessages.value = data.messages || [];
+      } catch (err) {
+        console.error('加载会话详情失败:', err);
+        toast('加载会话详情失败', 'error');
+      } finally {
+        sessionLoading.value = false;
+      }
+    }
+
+    async function refreshSessionDetail() {
+      if (selectedSession.value) {
+        await openSessionDetail(selectedSession.value);
       }
     }
 
@@ -600,13 +614,8 @@ const app = createApp({
       // Apply saved theme
       applyTheme(isDarkTheme.value);
 
-      const conn = Utils.store.get('connection');
-      if (!conn || !conn.host) {
-        showSetup.value = true;
-      } else {
-        HermesAPI.init();
-        loadAll();
-      }
+      // Auto-connect: no setup dialog needed, backend handles Gateway auth
+      loadAll();
 
       const hash = window.location.hash.replace('#/', '');
       if (hash && pageTitleMap[hash]) {
@@ -615,10 +624,8 @@ const app = createApp({
 
       // 定时刷新
       setInterval(() => {
-        if (!showSetup.value) {
-          loadGatewayStatus();
-          loadSystemInfo();
-        }
+        loadGatewayStatus();
+        loadSystemInfo();
       }, 10000);
 
       setInterval(updateCharts, 5000);
@@ -633,16 +640,16 @@ const app = createApp({
     });
 
     return {
-      showSetup, setupHost, setupToken, setupError, setupLoading, doSetup,
       sidebarCollapsed, mobileMenuOpen, currentPage, currentPageTitle,
       menuItems, navigate,
       gatewayRunning, gatewayAdapters,
       dashboardStats, configModels, recentLogs,
       cpuChartEl, memChartEl,
       sessions, sessionSearch, filteredSessions, loadSessions, deleteSession,
+      selectedSession, sessionMessages, sessionLoading, openSessionDetail, refreshSessionDetail,
       cronJobs, loadCronJobs, toggleCron, runCron, deleteCron,
       skills, skillSearch, filteredSkills, loadSkills,
-      appConfig,
+      appConfig, switchForm, switchResult, switchModel,
       editableConfig, saveSettings, loadConfig,
       logEntries, filteredLogs, logLevel, logSearch, autoScroll, loadLogs, logViewer,
       systemInfo, monitorChartEl,
