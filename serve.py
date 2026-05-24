@@ -282,6 +282,71 @@ def delete_cron_job(job_id):
         return {'ok': True, 'deleted': job_id}
     return {'error': 'Failed to write data'}
 
+def create_cron_job(data):
+    """Create a new cron job."""
+    jobs_path = DATA_DIR / 'cron' / 'jobs.json'
+    if not jobs_path.parent.exists():
+        jobs_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if jobs_path.exists():
+        with open(jobs_path) as f:
+            cron_data = json.load(f)
+    else:
+        cron_data = {'jobs': []}
+
+    # Generate ID
+    import hashlib
+    import time as time_mod
+    job_id = hashlib.md5(f'{time_mod.time()}{json.dumps(data)}'.encode()).hexdigest()[:12]
+
+    # Parse schedule
+    schedule_kind = data.get('schedule_kind', 'interval')
+    if schedule_kind == 'cron':
+        cron_expr = data.get('cron_expression', '0 * * * *')
+        schedule = {'kind': 'cron', 'expression': cron_expr, 'display': cron_expr}
+        schedule_display = cron_expr
+    else:
+        minutes = int(data.get('interval_minutes', 60))
+        schedule = {'kind': 'interval', 'minutes': minutes, 'display': f'every {minutes}m'}
+        schedule_display = f'every {minutes}m'
+
+    from datetime import datetime
+    now = datetime.now().astimezone().isoformat()
+
+    new_job = {
+        'id': job_id,
+        'name': data.get('name', 'untitled'),
+        'prompt': data.get('prompt', ''),
+        'skills': [],
+        'skill': None,
+        'model': data.get('model', None),
+        'provider': data.get('provider', None),
+        'base_url': None,
+        'script': None,
+        'schedule': schedule,
+        'schedule_display': schedule_display,
+        'repeat': {'times': None, 'completed': 0},
+        'enabled': data.get('enabled', True),
+        'state': 'scheduled' if data.get('enabled', True) else 'paused',
+        'paused_at': None if data.get('enabled', True) else now,
+        'paused_reason': None,
+        'created_at': now,
+        'next_run_at': None,
+        'last_run_at': None,
+        'last_status': None,
+        'last_error': None,
+        'last_delivery_error': None,
+        'deliver': data.get('deliver', None),
+        'origin': {'platform': 'console', 'chat_id': None},
+    }
+
+    cron_data['jobs'].append(new_job)
+    with open(jobs_path, 'w') as f:
+        json.dump(cron_data, f, ensure_ascii=False, indent=2)
+
+    return {'ok': True, 'job': new_job}
+
+
 def get_skills():
     """读取技能列表"""
     skills = []
@@ -595,7 +660,7 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
                         self._json(result, 404)
                     else:
                         self._json(result)
-            elif path == '/api/cron':
+            elif path == '/api/cron' and method == 'GET':
                 self._json({'jobs': get_cron_jobs()})
             elif path.startswith('/api/cron/') and path.endswith('/toggle') and method == 'POST':
                 job_id = path.split('/')[-2]
@@ -610,6 +675,14 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
                 job_id = path.split('/')[-1]
                 result = delete_cron_job(job_id)
                 self._json(result, 400 if 'error' in result else 200)
+            elif path == '/api/cron' and method == 'POST':
+                if not body or not body.get('name'):
+                    self._json({'error': '任务名称不能为空'}, 400)
+                elif not body.get('prompt'):
+                    self._json({'error': 'Prompt 不能为空'}, 400)
+                else:
+                    result = create_cron_job(body)
+                    self._json(result, 201 if result.get('ok') else 400)
             elif path == '/api/skills':
                 self._json({'skills': get_skills()})
             elif path == '/api/system':

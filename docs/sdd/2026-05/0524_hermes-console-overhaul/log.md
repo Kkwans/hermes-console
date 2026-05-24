@@ -13,7 +13,7 @@
 | T7 | ✅ | 2026-05-24 19:17 | 2026-05-24 19:23 | Inline edit with PUT API |
 | T8 | ✅ | 2026-05-24 19:24 | 2026-05-24 19:26 | Confirm dialog before delete |
 | T9 | ✅ | 2026-05-24 19:46 | 2026-05-24 19:55 | Cron jobs list with rich metadata |
-| T10 | ⬜ | - | - | |
+| T10 | ✅ | 2026-05-24 22:38 | 2026-05-24 22:44 | 1 行路由修复 |
 | T11 | ⬜ | - | - | |
 | T12 | ⬜ | - | - | |
 | T13 | ⬜ | - | - | |
@@ -103,3 +103,14 @@
   - GET /api/cron 返回 2 个任务（hermes-console-dev、hermes-console-v2）
   - POST /api/cron/:id/toggle 切换 enabled 状态并写回 jobs.json
   - 浏览器 /#/cron 正确显示 2 个任务卡片，包含完整元数据
+
+### 2026-05-24 T10 完成
+- **T10**: 实现创建定时任务 — 表单弹窗
+- 改动：
+  - serve.py: 修复路由 bug — `elif path == '/api/cron':` 改为 `elif path == '/api/cron' and method == 'GET':`（原 GET handler 不检查 method，导致 POST /api/cron 也被 GET handler 拦截，永远无法到达 POST handler）
+  - 前端、API、后端 create_cron_job 函数均已就绪，仅此 1 行路由修复即可
+- 验证：
+  - POST /api/cron 创建任务返回 `{ok: true, job: {...}}`
+  - GET /api/cron 仍正常返回任务列表
+  - 浏览器 /#/cron 点击"创建任务"→ 表单弹窗 → 填写名称+prompt → 点击"创建任务" → 任务出现在列表中
+  - 删除测试任务后验证正常

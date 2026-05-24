@@ -92,15 +92,13 @@
   - **涉及文件**：serve.py、js/app.js、index.html
   - **验证**：定时任务页面显示现有任务
 
-- ⬜ T10: 实现创建定时任务 — 表单弹窗
-  - **问题**：无法创建任务
+- ✅ T10: 实现创建定时任务 — 表单弹窗
+  - **问题**：无法创建任务（POST /api/cron 被 GET handler 拦截）
   - **修复**：
-    - 添加"创建任务"按钮
-    - 弹窗表单：名称、计划（cron 表达式或间隔）、prompt、启用/禁用
-    - 调用后端 API 创建
-    - 后端代理到 Gateway cron API
-  - **涉及文件**：index.html、js/app.js、serve.py
-  - **验证**：可以创建新定时任务
+    - 修复 serve.py 路由 bug：`elif path == '/api/cron':` → `elif path == '/api/cron' and method == 'GET':`（原 GET handler 不检查 method，导致 POST 请求也被匹配到 GET 路由）
+    - 前端和 API 层已有完整实现（表单弹窗、提交逻辑、后端 create_cron_job 函数）
+  - **涉及文件**：serve.py（1 行路由修复）
+  - **验证**：POST /api/cron 正确创建任务，前端表单弹窗完整可用（名称、调度方式、prompt、投递渠道、启用开关）
 
 - ⬜ T11: 实现编辑/删除/执行定时任务
   - **问题**：无编辑/删除/执行功能

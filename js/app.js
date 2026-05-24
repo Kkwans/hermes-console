@@ -42,6 +42,20 @@ const app = createApp({
     // Cron
     const cronJobs = ref([]);
 
+    // Cron form (create/edit)
+    const showCronForm = ref(false);
+    const cronFormMode = ref('create');  // 'create' or 'edit'
+    const cronFormSubmitting = ref(false);
+    const cronForm = ref({
+      name: '',
+      schedule_kind: 'interval',
+      interval_minutes: 60,
+      cron_expression: '0 * * * *',
+      prompt: '',
+      enabled: true,
+      deliver: '',
+    });
+
     // Skills
     const skills = ref([]);
     const skillSearch = ref('');
@@ -341,6 +355,77 @@ const app = createApp({
       confirmMsg.value = `确认要删除定时任务「${jobName}」吗？此操作不可撤销。`;
       confirmAction = () => deleteCron(job.id);
       showConfirm.value = true;
+    }
+
+    function openCronForm(mode = 'create', job = null) {
+      cronFormMode.value = mode;
+      if (mode === 'edit' && job) {
+        cronForm.value = {
+          id: job.id,
+          name: job.name || '',
+          schedule_kind: job.schedule?.kind || 'interval',
+          interval_minutes: job.schedule?.minutes || 60,
+          cron_expression: job.schedule?.expression || '0 * * * *',
+          prompt: job.prompt || '',
+          enabled: job.enabled !== false,
+          deliver: job.deliver || '',
+        };
+      } else {
+        cronForm.value = {
+          name: '',
+          schedule_kind: 'interval',
+          interval_minutes: 60,
+          cron_expression: '0 * * * *',
+          prompt: '',
+          enabled: true,
+          deliver: '',
+        };
+      }
+      showCronForm.value = true;
+    }
+
+    function resetCronForm() {
+      showCronForm.value = false;
+      cronFormSubmitting.value = false;
+    }
+
+    async function submitCronForm() {
+      const form = cronForm.value;
+      if (!form.name.trim()) {
+        toast('请输入任务名称', 'error');
+        return;
+      }
+      if (!form.prompt.trim()) {
+        toast('请输入 Prompt 内容', 'error');
+        return;
+      }
+      cronFormSubmitting.value = true;
+      try {
+        if (cronFormMode.value === 'edit' && form.id) {
+          // Update via toggle + recreate (simple approach: delete old, create new)
+          await HermesAPI.deleteCron(form.id);
+        }
+        const result = await HermesAPI.createCronJob({
+          name: form.name,
+          schedule_kind: form.schedule_kind,
+          interval_minutes: parseInt(form.interval_minutes) || 60,
+          cron_expression: form.cron_expression,
+          prompt: form.prompt,
+          enabled: form.enabled,
+          deliver: form.deliver || undefined,
+        });
+        if (result.ok) {
+          toast(cronFormMode.value === 'create' ? '定时任务已创建' : '定时任务已更新', 'success');
+          resetCronForm();
+          await loadCronJobs();
+        } else {
+          toast('操作失败: ' + (result.error || '未知错误'), 'error');
+        }
+      } catch (err) {
+        toast('操作失败: ' + err.message, 'error');
+      } finally {
+        cronFormSubmitting.value = false;
+      }
     }
 
     async function loadSkills() {
@@ -716,6 +801,7 @@ const app = createApp({
       sessionPage, totalSessionPages, paginatedSessions,
       selectedSession, sessionMessages, sessionLoading, sessionTotal, sessionDetailTitle, openSessionDetail, refreshSessionDetail,
       cronJobs, loadCronJobs, toggleCron, runCron, deleteCron, confirmDeleteCron,
+      showCronForm, cronFormMode, cronForm, cronFormSubmitting, openCronForm, resetCronForm, submitCronForm,
       skills, skillSearch, filteredSkills, loadSkills,
       appConfig, switchForm, switchResult, switchModel,
       editableConfig, saveSettings, loadConfig,

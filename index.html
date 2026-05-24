@@ -258,6 +258,7 @@
           <!-- 定时任务 -->
           <div v-else-if="currentPage === 'cron'" class="page-cron">
             <div class="page-toolbar">
+              <button @click="openCronForm('create')" class="btn-primary btn-create">＋ 创建任务</button>
               <span class="toolbar-count">{{ cronJobs.length }} 个任务</span>
               <button @click="loadCronJobs" class="btn-ghost">刷新</button>
             </div>
@@ -295,6 +296,7 @@
                 </div>
                 <div class="cron-actions">
                   <button class="btn-sm" @click="toggleCron(job)">{{ job.enabled ? '⏸ 暂停' : '▶ 启用' }}</button>
+                  <button class="btn-sm" @click="openCronForm('edit', job)">✏️ 编辑</button>
                   <button class="btn-sm btn-primary" @click="runCron(job.id)">⚡ 立即执行</button>
                   <button class="btn-sm btn-danger" @click="confirmDeleteCron(job)">🗑 删除</button>
                 </div>
@@ -582,6 +584,64 @@
       </main>
     </div>
 
+
+    <!-- 创建/编辑定时任务弹窗 -->
+    <div v-if="showCronForm" class="confirm-overlay" @click.self="resetCronForm()">
+      <div class="cron-form-modal">
+        <div class="cron-form-header">
+          <h3>{{ cronFormMode === 'create' ? '创建定时任务' : '编辑定时任务' }}</h3>
+          <button @click="resetCronForm()" class="btn-close">✕</button>
+        </div>
+        <div class="cron-form-body">
+          <div class="form-group">
+            <label class="form-label">任务名称 <span class="required">*</span></label>
+            <input v-model="cronForm.name" type="text" placeholder="例如：每日摘要" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">调度方式</label>
+            <div class="schedule-kind-tabs">
+              <button :class="{ active: cronForm.schedule_kind === 'interval' }" @click="cronForm.schedule_kind = 'interval'" class="tab-btn">固定间隔</button>
+              <button :class="{ active: cronForm.schedule_kind === 'cron' }" @click="cronForm.schedule_kind = 'cron'" class="tab-btn">Cron 表达式</button>
+            </div>
+          </div>
+          <div v-if="cronForm.schedule_kind === 'interval'" class="form-group">
+            <label class="form-label">间隔时间（分钟）</label>
+            <input v-model.number="cronForm.interval_minutes" type="number" min="1" placeholder="60" class="form-input">
+            <span class="form-hint">每隔 {{ cronForm.interval_minutes || 60 }} 分钟执行一次</span>
+          </div>
+          <div v-else class="form-group">
+            <label class="form-label">Cron 表达式</label>
+            <input v-model="cronForm.cron_expression" type="text" placeholder="0 * * * *" class="form-input mono-text">
+            <span class="form-hint">格式: 分 时 日 月 周（例: 0 9 * * * = 每天9点）</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prompt 内容 <span class="required">*</span></label>
+            <textarea v-model="cronForm.prompt" placeholder="描述任务要执行的操作..." class="form-textarea" rows="4"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">投递至渠道</label>
+            <select v-model="cronForm.deliver" class="form-input">
+              <option value="">不投递（仅记录）</option>
+              <option v-for="a in gatewayAdapters" :key="a.name" :value="a.name">{{ getChannelLabel(a.name) }} ({{ a.name }})</option>
+            </select>
+          </div>
+          <div class="form-group form-toggle-group">
+            <label class="form-label">创建后立即启用</label>
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="cronForm.enabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="cron-form-footer">
+          <button @click="resetCronForm()" class="btn-ghost">取消</button>
+          <button @click="submitCronForm()" class="btn-primary" :disabled="cronFormSubmitting">
+            {{ cronFormSubmitting ? '提交中...' : (cronFormMode === 'create' ? '创建任务' : '保存修改') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 确认弹窗 -->
     <div v-if="showConfirm" class="confirm-overlay" @click.self="showConfirm = false">
       <div class="confirm-modal">
@@ -604,7 +664,7 @@
   </div>
 
   <script src="js/utils.js?v=2"></script>
-  <script src="js/api.js?v=2"></script>
+  <script src="js/api.js?v=5"></script>
   <script src="js/app.js?v=2"></script>
 </body>
 </html>

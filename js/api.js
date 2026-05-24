@@ -97,6 +97,14 @@ const HermesAPI = {
     return this.proxy('/cron');
   },
 
+  /** 创建定时任务 */
+  async createCronJob(data) {
+    return this.proxy('/cron', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   /** 切换定时任务 */
   async toggleCron(id, enabled) {
     return this.proxy(`/cron/${id}/toggle`, {
