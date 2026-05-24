@@ -207,6 +207,74 @@ def get_system_info():
 
     return info
 
+def get_plugins():
+    """读取已安装的插件（MCP servers + 工具集）"""
+    plugins = []
+    config = read_yaml(DATA_DIR / 'config.yaml') or {}
+
+    # MCP servers from config
+    mcp_servers = config.get('mcp_servers', {})
+    if isinstance(mcp_servers, dict):
+        for name, conf in mcp_servers.items():
+            plugins.append({
+                'name': name,
+                'type': 'mcp',
+                'description': conf.get('description', f'MCP Server: {name}'),
+                'enabled': conf.get('enabled', True),
+                'command': conf.get('command', ''),
+                'args': conf.get('args', []),
+                'source': 'config',
+            })
+
+    # Toolsets from config
+    toolsets = config.get('toolsets', [])
+    if isinstance(toolsets, list):
+        for ts in toolsets:
+            if isinstance(ts, str):
+                plugins.append({
+                    'name': ts,
+                    'type': 'toolset',
+                    'description': f'内置工具集: {ts}',
+                    'enabled': True,
+                    'source': 'system',
+                })
+
+    # Platform toolsets
+    platform_toolsets = config.get('platform_toolsets', {})
+    if isinstance(platform_toolsets, dict):
+        for platform, tsets in platform_toolsets.items():
+            if isinstance(tsets, list):
+                for ts in tsets:
+                    if isinstance(ts, str):
+                        plugins.append({
+                            'name': ts,
+                            'type': 'platform_toolset',
+                            'description': f'{platform} 平台工具集',
+                            'enabled': True,
+                            'platform': platform,
+                            'source': 'system',
+                        })
+
+    # MCP native client servers (from mcp section)
+    mcp_section = config.get('mcp', {})
+    if isinstance(mcp_section, dict):
+        native_servers = mcp_section.get('servers', {})
+        if isinstance(native_servers, dict):
+            for name, conf in native_servers.items():
+                if isinstance(conf, dict):
+                    plugins.append({
+                        'name': name,
+                        'type': 'mcp_native',
+                        'description': conf.get('description', f'Native MCP: {name}'),
+                        'enabled': conf.get('enabled', True),
+                        'command': conf.get('command', ''),
+                        'transport': conf.get('transport', 'stdio'),
+                        'source': 'config',
+                    })
+
+    return plugins
+
+
 def get_logs(lines=200):
     """读取日志"""
     log_paths = [
@@ -332,6 +400,8 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
             elif path == '/api/logs':
                 lines = int(params.get('lines', ['200'])[0])
                 self._json({'logs': get_logs(lines)})
+            elif path == '/api/plugins':
+                self._json({'plugins': get_plugins()})
             elif path == '/api/memory':
                 self._json({'memory': []})
             else:

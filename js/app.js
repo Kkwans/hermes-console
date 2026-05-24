@@ -56,6 +56,11 @@ const app = createApp({
     const monitorCpuData = ref([]);
     const monitorMemData = ref([]);
 
+    // Plugins
+    const plugins = ref([]);
+    const pluginSearch = ref('');
+    const pluginTypeFilter = ref('');
+
     // Confirm dialog
     const showConfirm = ref(false);
     const confirmIcon = ref('⚠️');
@@ -293,7 +298,16 @@ const app = createApp({
         logEntries.value = data.logs || [];
         recentLogs.value = (data.logs || []).slice(-20);
       } catch (err) {
-        console.error('加载日志失败:', err);
+        console.error('Failed to load logs:', err);
+      }
+    }
+
+    async function loadPlugins() {
+      try {
+        const data = await HermesAPI.getPlugins();
+        plugins.value = data.plugins || [];
+      } catch (err) {
+        console.error('Failed to load plugins:', err);
       }
     }
 
@@ -360,6 +374,7 @@ const app = createApp({
         loadSkills(),
         loadSystemInfo(),
         loadLogs(),
+        loadPlugins(),
       ]);
       loadDashboardStats();
     }
@@ -522,6 +537,21 @@ const app = createApp({
       return logs;
     });
 
+    const filteredPlugins = computed(() => {
+      let result = plugins.value;
+      if (pluginTypeFilter.value) {
+        result = result.filter(p => p.type === pluginTypeFilter.value);
+      }
+      if (pluginSearch.value) {
+        const q = pluginSearch.value.toLowerCase();
+        result = result.filter(p =>
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q)
+        );
+      }
+      return result;
+    });
+
     // ===== Watchers =====
     watch(sidebarCollapsed, v => Utils.store.set('sidebar_collapsed', v));
     watch(filteredLogs, () => {
@@ -532,6 +562,37 @@ const app = createApp({
       if (logViewer.value) {
         logViewer.value.scrollTop = logViewer.value.scrollHeight;
       }
+    }
+
+    // ===== Plugin helpers =====
+    function getPluginIcon(type) {
+      const icons = {
+        mcp: '🔌',
+        mcp_native: '🔗',
+        toolset: '🛠️',
+        platform_toolset: '📡',
+      };
+      return icons[type] || '📦';
+    }
+
+    function getPluginTypeLabel(type) {
+      const labels = {
+        mcp: 'MCP',
+        mcp_native: '原生 MCP',
+        toolset: '工具集',
+        platform_toolset: '平台工具集',
+      };
+      return labels[type] || type;
+    }
+
+    function getPluginBadgeClass(type) {
+      const classes = {
+        mcp: 'badge-blue',
+        mcp_native: 'badge-green',
+        toolset: 'badge-yellow',
+        platform_toolset: 'badge-purple',
+      };
+      return classes[type] || 'badge-gray';
     }
 
     // ===== Lifecycle =====
@@ -586,6 +647,8 @@ const app = createApp({
       logEntries, filteredLogs, logLevel, logSearch, autoScroll, loadLogs, logViewer,
       systemInfo, monitorChartEl,
       monitorCpuData, monitorMemData,
+      plugins, pluginSearch, pluginTypeFilter, filteredPlugins, loadPlugins,
+      getPluginIcon, getPluginTypeLabel, getPluginBadgeClass,
       toasts, refreshData,
       formatTime: Utils.formatTime,
       maskKey: Utils.maskKey,

@@ -143,4 +143,9 @@ const HermesAPI = {
   async getMemory() {
     return this.proxy('/memory');
   },
+
+  /** 获取插件列表 */
+  async getPlugins() {
+    return this.proxy('/plugins');
+  },
 };

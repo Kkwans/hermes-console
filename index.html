@@ -414,10 +414,67 @@
 
           <!-- 插件管理 -->
           <div v-else-if="currentPage === 'plugins'" class="page-plugins">
-            <div class="empty-state">
-              <div class="empty-icon">🔌</div>
-              <h3>插件管理</h3>
-              <p>插件管理功能开发中...</p>
+            <div class="page-toolbar">
+              <select v-model="pluginTypeFilter" class="filter-select">
+                <option value="">全部类型</option>
+                <option value="mcp">MCP 服务器</option>
+                <option value="mcp_native">原生 MCP</option>
+                <option value="toolset">内置工具集</option>
+                <option value="platform_toolset">平台工具集</option>
+              </select>
+              <input v-model="pluginSearch" type="text" placeholder="搜索插件..." class="search-input">
+              <button @click="loadPlugins" class="btn-ghost">刷新</button>
+            </div>
+
+            <!-- 插件统计 -->
+            <div class="plugin-stats">
+              <div class="plugin-stat-item">
+                <span class="plugin-stat-value">{{ plugins.length }}</span>
+                <span class="plugin-stat-label">总数</span>
+              </div>
+              <div class="plugin-stat-item">
+                <span class="plugin-stat-value">{{ plugins.filter(p => p.enabled).length }}</span>
+                <span class="plugin-stat-label">已启用</span>
+              </div>
+              <div class="plugin-stat-item">
+                <span class="plugin-stat-value">{{ plugins.filter(p => p.type === 'mcp' || p.type === 'mcp_native').length }}</span>
+                <span class="plugin-stat-label">MCP 服务器</span>
+              </div>
+              <div class="plugin-stat-item">
+                <span class="plugin-stat-value">{{ plugins.filter(p => p.type === 'toolset' || p.type === 'platform_toolset').length }}</span>
+                <span class="plugin-stat-label">工具集</span>
+              </div>
+            </div>
+
+            <!-- 插件列表 -->
+            <div class="card-grid">
+              <div v-for="plugin in filteredPlugins" :key="plugin.name + plugin.type" class="plugin-card">
+                <div class="plugin-card-header">
+                  <div class="plugin-icon">{{ getPluginIcon(plugin.type) }}</div>
+                  <div class="plugin-info">
+                    <div class="plugin-name">{{ plugin.name }}</div>
+                    <span class="badge" :class="getPluginBadgeClass(plugin.type)">{{ getPluginTypeLabel(plugin.type) }}</span>
+                  </div>
+                  <div class="plugin-status" :class="plugin.enabled ? 'enabled' : 'disabled'">
+                    {{ plugin.enabled ? '✓ 已启用' : '○ 已禁用' }}
+                  </div>
+                </div>
+                <p class="plugin-desc">{{ plugin.description }}</p>
+                <div class="plugin-meta" v-if="plugin.command || plugin.platform">
+                  <span v-if="plugin.command" class="plugin-meta-item mono-text">{{ plugin.command }}</span>
+                  <span v-if="plugin.platform" class="plugin-meta-item">{{ plugin.platform }}</span>
+                  <span v-if="plugin.transport" class="plugin-meta-item">{{ plugin.transport }}</span>
+                </div>
+                <div class="plugin-source">
+                  <span class="badge badge-gray">{{ plugin.source === 'system' ? '系统内置' : '配置文件' }}</span>
+                </div>
+              </div>
+              <div v-if="!filteredPlugins.length" class="empty-state">
+                <div class="empty-icon">🔌</div>
+                <h3>暂无插件数据</h3>
+                <p v-if="pluginSearch || pluginTypeFilter">尝试调整搜索条件</p>
+                <p v-else>未检测到已配置的插件或工具集</p>
+              </div>
             </div>
           </div>
 
