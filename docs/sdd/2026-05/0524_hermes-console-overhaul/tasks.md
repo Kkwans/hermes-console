@@ -100,15 +100,15 @@
   - **涉及文件**：serve.py（1 行路由修复）
   - **验证**：POST /api/cron 正确创建任务，前端表单弹窗完整可用（名称、调度方式、prompt、投递渠道、启用开关）
 
-- ⬜ T11: 实现编辑/删除/执行定时任务
+- ✅ T11: 实现编辑/删除/执行定时任务
   - **问题**：无编辑/删除/执行功能
-  - **修复**：
-    - 编辑按钮 → 弹窗表单（预填数据）
-    - 删除按钮 → 确认弹窗
-    - 立即执行按钮 → 调用 API
-    - 后端补全对应 API
-  - **涉及文件**：index.html、js/app.js、serve.py
-  - **验证**：编辑/删除/立即执行均正常工作
+  - **修复**：前端、API、后端均已实现
+    - 编辑按钮 → `openCronForm('edit', job)` 预填弹窗，保存时 delete+create
+    - 删除按钮 → `confirmDeleteCron(job)` 确认弹窗 + `deleteCron(id)`
+    - 立即执行按钮 → `runCron(id)` 调用 POST /api/cron/:id/run
+    - 暂停/启用按钮 → `toggleCron(job)` 调用 POST /api/cron/:id/toggle
+  - **涉及文件**：index.html、js/app.js、js/api.js、serve.py（全部已就绪）
+  - **验证**：编辑弹窗预填数据正确、删除有确认弹窗、立即执行调用 API、暂停/启用切换状态
 
 ## 阶段 4: 模型配置 + 消息渠道（P0/P1）
 
