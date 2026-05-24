@@ -100,6 +100,9 @@
         <header class="topbar">
           <h1 class="page-title">{{ currentPageTitle }}</h1>
           <div class="topbar-actions">
+            <button @click="toggleTheme" class="theme-toggle" :title="isDarkTheme ? '切换到浅色主题' : '切换到深色主题'">
+              {{ isDarkTheme ? '☀️' : '🌙' }}
+            </button>
             <a :href="officialConsoleUrl" target="_blank" class="btn-ghost" title="打开官方控制台">
               🌐 官方控制台
             </a>

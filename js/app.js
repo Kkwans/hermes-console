@@ -20,6 +20,9 @@ const app = createApp({
     const gatewayAdapters = ref([]);
     const toasts = ref([]);
 
+    // Theme
+    const isDarkTheme = ref(Utils.store.get('theme', 'light') === 'dark');
+
     // Dashboard
     const dashboardStats = ref([]);
     const configModels = ref([]);
@@ -118,6 +121,31 @@ const app = createApp({
       Utils.store.set('current_page', page);
       window.location.hash = '#/' + page;
       nextTick(() => onPageLoad(page));
+    }
+
+    // ===== Theme =====
+    function applyTheme(dark) {
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      // Update ECharts theme
+      const textColor = dark ? '#8a8f98' : '#6b7280';
+      const splitColor = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+      const tooltipBg = dark ? '#191a1b' : '#ffffff';
+      const tooltipBorder = dark ? '#23252a' : '#e5e7eb';
+      const tooltipText = dark ? '#f7f8f8' : '#1a1d23';
+      [cpuChartInst, memChartInst, monitorChartInst].forEach(c => {
+        if (!c) return;
+        c.setOption({
+          xAxis: { axisLabel: { color: textColor } },
+          yAxis: { axisLabel: { color: textColor }, splitLine: { lineStyle: { color: splitColor } } },
+          tooltip: { backgroundColor: tooltipBg, borderColor: tooltipBorder, textStyle: { color: tooltipText } },
+        });
+      });
+    }
+
+    function toggleTheme() {
+      isDarkTheme.value = !isDarkTheme.value;
+      Utils.store.set('theme', isDarkTheme.value ? 'dark' : 'light');
+      applyTheme(isDarkTheme.value);
     }
 
     // ===== Setup =====
@@ -348,27 +376,41 @@ const app = createApp({
     }
 
     // ===== Charts =====
-    const chartBaseOpt = {
-      backgroundColor: 'transparent',
-      grid: { top: 10, right: 20, bottom: 30, left: 40 },
-      xAxis: {
-        type: 'category', data: [],
-        axisLine: { lineStyle: { color: '#23252a' } },
-        axisLabel: { color: '#62666d', fontSize: 10 },
-      },
-      yAxis: {
-        type: 'value', max: 100,
-        axisLine: { show: false },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } },
-        axisLabel: { color: '#62666d', fontSize: 10 },
-      },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: '#191a1b',
-        borderColor: '#23252a',
-        textStyle: { color: '#f7f8f8' },
-      },
-    };
+    function getChartColors() {
+      const dark = isDarkTheme.value;
+      return {
+        textColor: dark ? '#8a8f98' : '#6b7280',
+        splitColor: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
+        tooltipBg: dark ? '#191a1b' : '#ffffff',
+        tooltipBorder: dark ? '#23252a' : '#e5e7eb',
+        tooltipText: dark ? '#f7f8f8' : '#1a1d23',
+      };
+    }
+
+    function makeChartOpt() {
+      const c = getChartColors();
+      return {
+        backgroundColor: 'transparent',
+        grid: { top: 10, right: 20, bottom: 30, left: 40 },
+        xAxis: {
+          type: 'category', data: [],
+          axisLine: { lineStyle: { color: c.splitColor } },
+          axisLabel: { color: c.textColor, fontSize: 10 },
+        },
+        yAxis: {
+          type: 'value', max: 100,
+          axisLine: { show: false },
+          splitLine: { lineStyle: { color: c.splitColor } },
+          axisLabel: { color: c.textColor, fontSize: 10 },
+        },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: c.tooltipBg,
+          borderColor: c.tooltipBorder,
+          textStyle: { color: c.tooltipText },
+        },
+      };
+    }
 
     function makeLineSeries(color) {
       return [{
@@ -391,7 +433,7 @@ const app = createApp({
       if (cpuChartEl.value && !cpuChartInst) {
         cpuChartInst = echarts.init(cpuChartEl.value);
         cpuChartInst.setOption({
-          ...chartBaseOpt,
+          ...makeChartOpt(),
           series: [{
             type: 'line', data: [], smooth: true,
             lineStyle: { color: '#5e6ad2', width: 2 },
@@ -403,7 +445,7 @@ const app = createApp({
       if (memChartEl.value && !memChartInst) {
         memChartInst = echarts.init(memChartEl.value);
         memChartInst.setOption({
-          ...chartBaseOpt,
+          ...makeChartOpt(),
           series: [{
             type: 'line', data: [], smooth: true,
             lineStyle: { color: '#10b981', width: 2 },
@@ -418,7 +460,7 @@ const app = createApp({
       if (monitorChartEl.value && !monitorChartInst) {
         monitorChartInst = echarts.init(monitorChartEl.value);
         monitorChartInst.setOption({
-          ...chartBaseOpt,
+          ...makeChartOpt(),
           grid: { top: 30, right: 20, bottom: 30, left: 40 },
           legend: { data: ['CPU', '内存'], textStyle: { color: '#8a8f98' }, top: 0 },
           series: [
@@ -494,6 +536,9 @@ const app = createApp({
 
     // ===== Lifecycle =====
     onMounted(() => {
+      // Apply saved theme
+      applyTheme(isDarkTheme.value);
+
       const conn = Utils.store.get('connection');
       if (!conn || !conn.host) {
         showSetup.value = true;
@@ -551,6 +596,7 @@ const app = createApp({
       confirmRestartGateway, startGateway,
       showConfirm, confirmIcon, confirmTitle, confirmMsg,
       confirmAction,
+      isDarkTheme, toggleTheme,
     };
   },
 });
