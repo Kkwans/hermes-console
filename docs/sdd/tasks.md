@@ -35,7 +35,7 @@
 
 - [x] T18: 功能测试验证
 - [x] T19: README.md + CHANGELOG.md
-- [ ] T20: 代码同步到 GitHub（已创建仓库，待 push）
+- [x] T20: 代码同步到 GitHub（已创建仓库，待 push）
 
 ## 阶段 6: 验收
 
