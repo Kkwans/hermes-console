@@ -794,3 +794,48 @@ body {
   .stat-grid { grid-template-columns: 1fr; }
   .monitor-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== Mobile: Table → Card Layout ===== */
+@media (max-width: 640px) {
+  .data-table thead { display: none; }
+  .data-table tbody tr {
+    display: block;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .data-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 0.85rem;
+  }
+  .data-table tbody td:last-child { border-bottom: none; }
+  .data-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Better touch targets */
+  .btn-sm { padding: 0.5rem 0.8rem; font-size: 0.8rem; }
+  .btn-ghost { padding: 0.5rem 0.9rem; }
+  .nav-item { padding: 0.75rem 0.75rem; }
+  .search-input { min-width: 100%; max-width: 100%; }
+
+  /* Full-width inputs on mobile */
+  .page-toolbar { flex-direction: column; }
+  .page-toolbar > * { width: 100%; }
+
+  /* Cron cards */
+  .cron-actions { flex-wrap: wrap; }
+  .cron-actions .btn-sm { flex: 1; text-align: center; }
+}

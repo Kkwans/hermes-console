@@ -191,11 +191,11 @@
                 </thead>
                 <tbody>
                   <tr v-for="s in filteredSessions" :key="s.id">
-                    <td class="mono-text">{{ s.id.slice(0, 12) }}...</td>
-                    <td>{{ s.title || '未命名' }}</td>
-                    <td><span class="badge">{{ s.source || 'cli' }}</span></td>
-                    <td>{{ formatTime(s.updated_at) }}</td>
-                    <td>
+                    <td data-label="ID" class="mono-text">{{ s.id.slice(0, 12) }}...</td>
+                    <td data-label="标题">{{ s.title || '未命名' }}</td>
+                    <td data-label="来源"><span class="badge">{{ s.source || 'cli' }}</span></td>
+                    <td data-label="活跃">{{ formatTime(s.updated_at) }}</td>
+                    <td data-label="操作">
                       <button class="btn-sm btn-danger" @click="deleteSession(s.id)">删除</button>
                     </td>
                   </tr>
