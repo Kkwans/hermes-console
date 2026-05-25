@@ -105,6 +105,7 @@
               <div class="status-card-left">
                 <div class="status-indicator">
                   <div class="status-dot-lg" :class="gatewayRunning ? 'dot-on' : 'dot-off'"></div>
+                  <div v-if="gatewayRunning" class="status-dot-ring"></div>
                 </div>
                 <div class="status-main">
                   <div class="status-state">{{ gatewayRunning ? '运行中' : '已停止' }}</div>
