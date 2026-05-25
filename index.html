@@ -100,7 +100,42 @@
         <div class="content-area">
           <!-- 仪表盘 -->
           <div v-if="currentPage === 'dashboard'" class="page-dashboard">
-            <!-- 状态卡片 -->
+            <!-- Gateway 状态英雄卡片 -->
+            <div class="status-hero" :class="gatewayRunning ? 'status-hero-ok' : 'status-hero-err'">
+              <div class="status-hero-left">
+                <div class="status-hero-dot" :class="gatewayRunning ? 'dot-on' : 'dot-off'"></div>
+                <div class="status-hero-info">
+                  <div class="status-hero-state">{{ gatewayRunning ? '运行中' : '已停止' }}</div>
+                  <div class="status-hero-label">Gateway 服务状态</div>
+                </div>
+              </div>
+              <div class="status-hero-meta">
+                <div class="status-meta-item" v-if="systemInfo.uptime">
+                  <span class="status-meta-label">运行时长</span>
+                  <span class="status-meta-value">{{ systemInfo.uptime }}</span>
+                </div>
+                <div class="status-meta-item">
+                  <span class="status-meta-label">版本</span>
+                  <span class="status-meta-value">ClawDash v0.5.0</span>
+                </div>
+                <div class="status-meta-item" v-if="systemInfo.cpu_percent !== undefined">
+                  <span class="status-meta-label">CPU</span>
+                  <span class="status-meta-value">{{ systemInfo.cpu_percent }}%</span>
+                </div>
+                <div class="status-meta-item" v-if="systemInfo.mem_percent !== undefined">
+                  <span class="status-meta-label">内存</span>
+                  <span class="status-meta-value">{{ systemInfo.mem_percent }}%</span>
+                </div>
+              </div>
+              <div class="status-hero-actions">
+                <button v-if="gatewayRunning" @click="confirmRestartGateway" class="btn-sm btn-warn" title="重启 Gateway">🔄 重启</button>
+                <button v-else @click="startGateway" class="btn-sm btn-primary" title="启动 Gateway">▶️ 启动</button>
+                <button @click="refreshData" class="btn-ghost" title="刷新数据">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24L10 6h6V0l-2.35 2.35z"/></svg>
+                </button>
+              </div>
+            </div>
+            <!-- 统计卡片 -->
             <div class="stat-grid">
               <div class="stat-card" v-for="stat in dashboardStats" :key="stat.label">
                 <div class="stat-icon-wrap" :style="{ background: stat.iconBg }">

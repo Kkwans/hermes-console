@@ -518,7 +518,7 @@ const app = createApp({
         { icon: '⚡', label: 'Gateway 状态', value: gatewayRunning.value ? '运行中' : '已停止', iconBg: gatewayRunning.value ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' },
         { icon: '💬', label: '活跃会话', value: sessions.value.length || '0', iconBg: 'rgba(59,130,246,0.1)' },
         { icon: '⏰', label: '定时任务', value: cronJobs.value.length || '0', iconBg: 'rgba(245,158,11,0.1)' },
-        { icon: '🧩', label: '已安装技能', value: skills.value.length || '0', iconBg: 'rgba(139,92,246,0.1)' },
+        { icon: '🧩', label: '已安装技能', value: skills.value.length || '0', iconBg: 'rgba(128,128,128,0.1)' },
       ];
     }
 

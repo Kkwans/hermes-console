@@ -424,6 +424,85 @@ body {
 .badge-blue { background: var(--blue-dim); color: var(--blue); border-color: transparent; }
 .badge-gray { background: var(--bg-elevated); color: var(--text-muted); border-color: transparent; }
 
+/* ===== Status Hero Card ===== */
+.status-hero {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 1.5rem 2rem;
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+  transition: box-shadow var(--transition-normal);
+  border: 1px solid var(--border);
+}
+.status-hero:hover {
+  box-shadow: var(--shadow-lg);
+}
+.status-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+.status-hero-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-hero-dot.dot-on {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse-green 2s infinite;
+}
+.status-hero-dot.dot-off {
+  background: var(--red);
+}
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 6px var(--green); }
+  50% { box-shadow: 0 0 14px var(--green); }
+}
+.status-hero-state {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.status-hero-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.status-hero-meta {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.status-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.status-meta-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-meta-value {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+.status-hero-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 /* ===== Stat Cards ===== */
 .stat-grid {
   display: grid;
@@ -2205,6 +2284,21 @@ mark.log-highlight {
   /* Content: tighter padding */
   .content-area { padding: 1rem; }
   .topbar { padding: 0 0.75rem; }
+
+  /* Status hero: stack on mobile */
+  .status-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.2rem;
+  }
+  .status-hero-meta {
+    gap: 1rem;
+  }
+  .status-hero-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 
   /* Topbar: compact actions, hide text links */
   .topbar-actions { gap: 0.35rem; }
