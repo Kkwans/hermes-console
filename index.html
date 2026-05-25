@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-mono/style.min.css">
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/main.css?v=4">
+  <!-- Tailwind CDN removed — using CSS custom properties design system -->
+  <link rel="stylesheet" href="css/main.css?v=8">
 </head>
 <body>
   <div id="app" v-cloak>
@@ -315,79 +315,218 @@
           <!-- 技能管理 -->
           <div v-else-if="currentPage === 'skills'" class="page-skills">
             <div class="page-toolbar">
-              <input v-model="skillSearch" type="text" placeholder="搜索技能..." class="search-input">
+              <input v-model="skillSearch" type="text" placeholder="搜索技能名称或描述..." class="search-input">
+              <span class="toolbar-count">{{ filteredSkills.length }} / {{ skills.length }} 个技能</span>
               <button @click="loadSkills" class="btn-ghost">刷新</button>
             </div>
+            <!-- 分类筛选标签 -->
+            <div class="skill-category-tabs" v-if="skillCategories.length > 1">
+              <button v-for="cat in skillCategories" :key="cat" class="skill-cat-tab" :class="{ active: skillCategoryFilter === cat }" @click="skillCategoryFilter = skillCategoryFilter === cat ? '' : cat">
+                {{ cat }}
+                <span class="cat-count">{{ skills.filter(s => (s.category || '通用') === cat).length }}</span>
+              </button>
+            </div>
             <div class="card-grid">
-              <div v-for="skill in filteredSkills" :key="skill.name" class="skill-card">
+              <div v-for="skill in filteredSkills" :key="skill.name" class="skill-card" @click="openSkillDetail(skill)">
                 <div class="skill-header">
                   <span class="skill-name">{{ skill.name }}</span>
                   <span class="badge badge-blue">{{ skill.category || '通用' }}</span>
                 </div>
                 <p class="skill-desc">{{ skill.description || '暂无描述' }}</p>
                 <div class="skill-meta">
-                  <span>v{{ skill.version || '1.0' }}</span>
-                  <span>{{ skill.author || '未知' }}</span>
+                  <span class="skill-version">v{{ skill.version || '1.0' }}</span>
+                  <span class="skill-author">{{ skill.author || '未知' }}</span>
                 </div>
               </div>
-              <div v-if="!filteredSkills.length" class="empty-state">
+              <div v-if="!filteredSkills.length" class="empty-state empty-state-rich">
                 <div class="empty-icon">🧩</div>
-                <p>暂无技能数据</p>
+                <h3>{{ skillSearch ? '未找到匹配的技能' : '暂无技能数据' }}</h3>
+                <p v-if="skillSearch">尝试调整搜索关键词</p>
+                <p v-else>技能存储在 skills 目录中，每个技能包含 SKILL.md 文件</p>
+              </div>
+            </div>
+
+            <!-- 技能详情弹窗 -->
+            <div v-if="selectedSkill" class="confirm-overlay" @click.self="selectedSkill = null">
+              <div class="skill-detail-modal">
+                <div class="skill-detail-header">
+                  <div class="skill-detail-title-row">
+                    <span class="skill-detail-icon">🧩</span>
+                    <div>
+                      <h3>{{ selectedSkill.name }}</h3>
+                      <span class="badge badge-blue">{{ selectedSkill.category || '通用' }}</span>
+                    </div>
+                  </div>
+                  <button @click="selectedSkill = null" class="btn-close">✕</button>
+                </div>
+                <div class="skill-detail-body">
+                  <div class="skill-detail-field" v-if="selectedSkill.description">
+                    <label>描述</label>
+                    <p>{{ selectedSkill.description }}</p>
+                  </div>
+                  <div class="skill-detail-grid">
+                    <div class="skill-detail-field">
+                      <label>版本</label>
+                      <span>v{{ selectedSkill.version || '1.0' }}</span>
+                    </div>
+                    <div class="skill-detail-field">
+                      <label>作者</label>
+                      <span>{{ selectedSkill.author || '未知' }}</span>
+                    </div>
+                    <div class="skill-detail-field" v-if="selectedSkill.category">
+                      <label>分类</label>
+                      <span>{{ selectedSkill.category }}</span>
+                    </div>
+                  </div>
+                  <div class="skill-detail-field" v-if="selectedSkill.path">
+                    <label>文件路径</label>
+                    <span class="mono-text">{{ selectedSkill.path }}</span>
+                  </div>
+                </div>
+                <div class="skill-detail-footer">
+                  <button @click="selectedSkill = null" class="btn-ghost">关闭</button>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- 模型配置 -->
           <div v-else-if="currentPage === 'models'" class="page-models">
-            <div class="model-current">
-              <h3>当前模型</h3>
-              <div class="model-info-grid">
-                <div class="model-info-item">
-                  <span class="info-label">模型名称</span>
-                  <span class="info-value">{{ appConfig.model?.default || '未配置' }}</span>
+            <!-- 当前模型状态 -->
+            <div class="model-hero">
+              <div class="model-hero-left">
+                <div class="model-hero-label">当前模型</div>
+                <div class="model-hero-name">{{ appConfig.model?.default || '未配置' }}</div>
+                <div class="model-hero-meta">
+                  <span class="model-hero-provider badge">{{ appConfig.model?.provider || '未选择' }}</span>
+                  <span class="model-hero-url mono-text" v-if="appConfig.model?.base_url">{{ appConfig.model?.base_url }}</span>
                 </div>
-                <div class="model-info-item">
-                  <span class="info-label">提供商</span>
-                  <span class="info-value">{{ appConfig.model?.provider || '未配置' }}</span>
-                </div>
-                <div class="model-info-item">
-                  <span class="info-label">API 地址</span>
-                  <span class="info-value mono-text">{{ appConfig.model?.base_url || '未配置' }}</span>
+              </div>
+              <div class="model-hero-right">
+                <div class="model-hero-count">
+                  <span class="model-count-num">{{ Object.keys(appConfig.providers || {}).length }}</span>
+                  <span class="model-count-label">个提供商</span>
                 </div>
               </div>
             </div>
-            <div class="model-switch">
+
+            <!-- 切换模型区 -->
+            <div class="model-switch-card">
               <h3>切换模型</h3>
               <div class="model-switch-form">
                 <div class="form-group">
-                  <label>提供商</label>
-                  <select v-model="switchForm.provider" class="form-select">
+                  <label class="form-label">提供商</label>
+                  <select v-model="switchForm.provider" @change="onProviderChange" class="form-select">
                     <option value="">选择提供商</option>
                     <option v-for="(conf, name) in appConfig.providers || {}" :key="name" :value="name">{{ name }}</option>
                   </select>
                 </div>
                 <div class="form-group">
-                  <label>模型名称</label>
-                  <input v-model="switchForm.model" type="text" placeholder="例如: mimo-v2.5-pro" class="form-input">
+                  <label class="form-label">模型名称</label>
+                  <template v-if="modelSuggestions.length">
+                    <select v-model="switchForm.model" @change="onModelSelectChange" class="form-select">
+                      <option value="">选择模型</option>
+                      <option v-for="m in modelSuggestions" :key="m" :value="m">{{ m }}</option>
+                      <option value="__custom__">其他（自定义输入）...</option>
+                    </select>
+                  </template>
+                  <template v-else>
+                    <input v-model="switchForm.model" type="text" placeholder="输入模型名称" class="form-input" @input="switchResult = null">
+                  </template>
+                  <span v-if="switchForm.provider && modelSuggestions.length" class="form-hint">
+                    已知模型：{{ modelSuggestions.slice(0, 5).join('、') }}{{ modelSuggestions.length > 5 ? '...' : '' }}
+                  </span>
                 </div>
-                <button @click="switchModel" class="btn-primary" :disabled="!switchForm.provider || !switchForm.model">
-                  切换模型
+                <!-- 自定义模型输入 -->
+                <div v-if="switchForm.model === '__custom__'" class="form-group">
+                  <label class="form-label">自定义模型名称 <span class="required">*</span></label>
+                  <input v-model="customModelName" type="text" placeholder="输入完整的模型名称" class="form-input" @input="switchResult = null">
+                  <span v-if="customModelName && !isKnownModel(customModelName)" class="form-hint form-hint-warn">⚠ 该模型不在已知列表中，请确认名称正确</span>
+                  <span v-else-if="customModelName && isKnownModel(customModelName)" class="form-hint form-hint-ok">✓ 已知模型</span>
+                </div>
+                <!-- 验证提示 -->
+                <div v-if="switchForm.provider && switchForm.model && switchForm.model !== '__custom__'" class="model-verify">
+                  <span class="verify-icon">✓</span>
+                  <span class="verify-text">将切换到 <strong>{{ switchForm.model }}</strong></span>
+                </div>
+                <button @click="switchModel" class="btn-primary" :disabled="!canSwitchModel">
+                  {{ switchForm.model === '__custom__' ? '使用自定义模型' : '切换模型' }}
                 </button>
                 <span v-if="switchResult" class="switch-result" :class="switchResult.ok ? 'success' : 'error'">
                   {{ switchResult.ok ? '✓ 切换成功' : '✗ ' + switchResult.error }}
                 </span>
               </div>
             </div>
+
+            <!-- 提供商列表 -->
             <div class="model-providers">
-              <h3>已配置提供商</h3>
+              <div class="section-header">
+                <h3>已配置提供商</h3>
+                <button @click="openProviderForm('create')" class="btn-sm btn-primary">＋ 添加提供商</button>
+              </div>
               <div class="card-grid">
-                <div v-for="(conf, name) in appConfig.providers || {}" :key="name" class="provider-card" @click="switchForm.provider = name">
-                  <div class="provider-name">{{ name }}</div>
-                  <div class="provider-url mono-text">{{ conf.base_url || '默认地址' }}</div>
+                <div v-for="(conf, name) in appConfig.providers || {}" :key="name" class="provider-card" :class="{ 'provider-active': switchForm.provider === name }">
+                  <div class="provider-card-header">
+                    <div class="provider-card-left">
+                      <div class="provider-icon">{{ getProviderIcon(name) }}</div>
+                      <div>
+                        <div class="provider-name" @click="selectProvider(name)">{{ name }}</div>
+                        <div class="provider-url mono-text">{{ conf.base_url || '默认地址' }}</div>
+                      </div>
+                    </div>
+                    <div class="provider-card-actions">
+                      <button class="btn-icon" @click.stop="openProviderForm('edit', name, conf)" title="编辑">✏️</button>
+                      <button class="btn-icon btn-cancel" @click.stop="confirmDeleteProvider(name)" title="删除">✕</button>
+                    </div>
+                  </div>
                   <div class="provider-key mono-text">{{ maskKey(conf.api_key) }}</div>
+                  <div class="provider-models" v-if="knownModels[name]">
+                    <span class="provider-models-label">可用模型：</span>
+                    <span v-for="m in knownModels[name].slice(0, 3)" :key="m" class="provider-model-tag" @click.stop="quickSwitchModel(name, m)">{{ m }}</span>
+                    <span v-if="knownModels[name].length > 3" class="provider-model-more">+{{ knownModels[name].length - 3 }}</span>
+                  </div>
                 </div>
                 <div v-if="!Object.keys(appConfig.providers || {}).length" class="empty-state">
-                  <p>暂无提供商配置</p>
+                  <div class="empty-icon">🤖</div>
+                  <h3>暂无提供商配置</h3>
+                  <p>添加提供商后即可切换模型</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 提供商表单弹窗 -->
+            <div v-if="showProviderForm" class="confirm-overlay" @click.self="showProviderForm = false">
+              <div class="cron-form-modal">
+                <div class="cron-form-header">
+                  <h3>{{ providerFormMode === 'create' ? '添加提供商' : '编辑提供商' }}</h3>
+                  <button @click="showProviderForm = false" class="btn-close">✕</button>
+                </div>
+                <div class="cron-form-body">
+                  <div class="form-group">
+                    <label class="form-label">提供商名称 <span class="required">*</span></label>
+                    <select v-if="providerFormMode === 'create'" v-model="providerForm.name" class="form-select">
+                      <option value="">选择或输入提供商</option>
+                      <option v-for="p in availableProviders" :key="p" :value="p">{{ p }}</option>
+                    </select>
+                    <input v-if="providerFormMode === 'create' && !providerForm.name" v-model="providerForm.name" type="text" placeholder="或手动输入名称" class="form-input" style="margin-top: 0.35rem;">
+                    <input v-if="providerFormMode === 'edit'" v-model="providerForm.name" type="text" class="form-input input-disabled" disabled>
+                    <span class="form-hint">唯一标识，创建后不可修改</span>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">API 地址</label>
+                    <input v-model="providerForm.base_url" type="text" :placeholder="getProviderUrlHint(providerForm.name)" class="form-input mono-text">
+                    <span v-if="providerForm.name && getProviderUrlHint(providerForm.name)" class="form-hint">常用地址：{{ getProviderUrlHint(providerForm.name) }}</span>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input v-model="providerForm.api_key" type="password" placeholder="sk-..." class="form-input mono-text">
+                  </div>
+                </div>
+                <div class="cron-form-footer">
+                  <button @click="showProviderForm = false" class="btn-ghost">取消</button>
+                  <button @click="submitProviderForm" class="btn-primary" :disabled="!providerForm.name.trim()">
+                    {{ providerFormMode === 'create' ? '添加' : '保存' }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -395,75 +534,216 @@
 
           <!-- 消息渠道 -->
           <div v-else-if="currentPage === 'channels'" class="page-channels">
+            <div class="page-toolbar">
+              <span class="toolbar-count">{{ gatewayAdapters.length }} 个渠道</span>
+              <button @click="loadGatewayStatus" class="btn-ghost">刷新</button>
+            </div>
             <div class="card-grid">
-              <div v-for="adapter in gatewayAdapters" :key="adapter.name" class="channel-card">
-                <div class="channel-icon">{{ getChannelIcon(adapter.name) }}</div>
-                <div class="channel-name">{{ adapter.name }}</div>
-                <div class="channel-status" :class="adapter.connected ? 'connected' : 'disconnected'">
-                  {{ adapter.connected ? '已连接' : '未连接' }}
+              <div v-for="adapter in gatewayAdapters" :key="adapter.name" class="channel-card-enhanced">
+                <div class="channel-card-top">
+                  <div class="channel-card-icon">{{ getChannelIcon(adapter.name) }}</div>
+                  <div class="channel-card-info">
+                    <div class="channel-card-name">{{ getChannelLabel(adapter.name) }}</div>
+                    <div class="channel-card-id mono-text">{{ adapter.name }}</div>
+                  </div>
+                  <div class="channel-card-status" :class="adapter.connected ? 'connected' : 'disconnected'">
+                    <span class="status-dot-sm" :class="adapter.connected ? 'dot-on' : 'dot-off'"></span>
+                    {{ adapter.connected ? '已连接' : '未连接' }}
+                  </div>
+                </div>
+                <div class="channel-card-desc" v-if="getChannelDescription(adapter.name)">
+                  {{ getChannelDescription(adapter.name) }}
+                </div>
+                <div class="channel-card-meta" v-if="adapter.connected !== undefined">
+                  <span class="channel-meta-label">状态：</span>
+                  <span :class="adapter.connected ? 'text-green' : 'text-muted'">
+                    {{ adapter.connected ? '通道正常' : '等待连接' }}
+                  </span>
                 </div>
               </div>
-              <div v-if="!gatewayAdapters.length" class="empty-state">
+              <div v-if="!gatewayAdapters.length" class="empty-state empty-state-rich">
                 <div class="empty-icon">📡</div>
-                <p>Gateway 未运行或暂无渠道连接</p>
+                <h3>暂无渠道连接</h3>
+                <p>Gateway 未运行或尚未配置消息渠道。渠道通过 config.yaml 配置，支持飞书、Telegram、Discord 等。</p>
+                <div class="empty-hint">
+                  <span>💡 在 config.yaml 中配置 adapters 字段添加渠道</span>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- 系统设置 -->
           <div v-else-if="currentPage === 'settings'" class="page-settings">
+            <!-- 智能体设置 -->
             <div class="settings-section">
-              <h3>🤖 智能体设置</h3>
-              <div class="setting-item">
-                <span class="setting-label">最大对话轮次</span>
-                <input v-model.number="editableConfig.agent.max_turns" type="number" class="setting-input">
+              <div class="settings-section-header">
+                <h3>🤖 智能体设置</h3>
+                <p class="settings-section-desc">控制 AI 助手的行为和推理能力</p>
               </div>
-              <div class="setting-item">
-                <span class="setting-label">工具调用策略</span>
-                <select v-model="editableConfig.agent.tool_use_enforcement" class="setting-input">
-                  <option value="auto">自动</option>
-                  <option value="required">强制</option>
-                  <option value="none">禁用</option>
-                </select>
+              <div class="settings-grid">
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">最大对话轮次</span>
+                    <span class="setting-hint">单次会话中 AI 最多执行的工具调用轮数，防止无限循环</span>
+                  </div>
+                  <input v-model.number="editableConfig.agent.max_turns" type="number" min="1" max="500" class="setting-input">
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">工具调用策略</span>
+                    <span class="setting-hint">auto = 按需调用，required = 强制使用工具，none = 禁用工具</span>
+                  </div>
+                  <select v-model="editableConfig.agent.tool_use_enforcement" class="setting-input">
+                    <option value="auto">自动</option>
+                    <option value="required">强制</option>
+                    <option value="none">禁用</option>
+                  </select>
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">推理深度</span>
+                    <span class="setting-hint">控制 AI 思考的深度：low 快速简洁，high 深度推理</span>
+                  </div>
+                  <select v-model="editableConfig.agent.reasoning_effort" class="setting-input">
+                    <option value="low">低 (快速)</option>
+                    <option value="medium">中 (平衡)</option>
+                    <option value="high">高 (深度)</option>
+                  </select>
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">详细日志</span>
+                    <span class="setting-hint">启用后 AI 输出更详细的执行日志，便于调试</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="editableConfig.agent.verbose">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
               </div>
             </div>
+
+            <!-- 显示设置 -->
             <div class="settings-section">
-              <h3>🎨 显示设置</h3>
-              <div class="setting-item">
-                <span class="setting-label">个性风格</span>
-                <select v-model="editableConfig.display.personality" class="setting-input">
-                  <option value="">默认</option>
-                  <option v-for="(p, name) in appConfig.agent?.personalities || {}" :key="name" :value="name">{{ name }}</option>
-                </select>
+              <div class="settings-section-header">
+                <h3>🎨 显示设置</h3>
+                <p class="settings-section-desc">控制界面显示和交互方式</p>
+              </div>
+              <div class="settings-grid">
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">个性风格</span>
+                    <span class="setting-hint">选择 AI 的对话风格和人设</span>
+                  </div>
+                  <select v-model="editableConfig.display.personality" class="setting-input">
+                    <option value="">默认</option>
+                    <option v-for="(p, name) in appConfig.agent?.personalities || {}" :key="name" :value="name">{{ name }}</option>
+                  </select>
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">紧凑模式</span>
+                    <span class="setting-hint">减少界面间距，显示更多内容</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="editableConfig.display.compact">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">流式输出</span>
+                    <span class="setting-hint">实时显示 AI 回复，关闭后等待完整响应</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="editableConfig.display.streaming">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">显示费用</span>
+                    <span class="setting-hint">在回复下方显示本次调用的 token 费用</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="editableConfig.display.show_cost">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">显示推理过程</span>
+                    <span class="setting-hint">展示 AI 的思考链（仅对支持的模型有效）</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="editableConfig.display.show_reasoning">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
               </div>
             </div>
+
+            <!-- 审批设置 -->
+            <div class="settings-section">
+              <div class="settings-section-header">
+                <h3>🔐 审批设置</h3>
+                <p class="settings-section-desc">控制敏感操作的审批流程</p>
+              </div>
+              <div class="settings-grid">
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">审批模式</span>
+                    <span class="setting-hint">auto = 自动批准，always = 始终需要确认，never = 跳过确认</span>
+                  </div>
+                  <select v-model="editableConfig.approvals.mode" class="setting-input">
+                    <option value="auto">自动</option>
+                    <option value="always">始终确认</option>
+                    <option value="never">跳过确认</option>
+                  </select>
+                </div>
+                <div class="setting-card">
+                  <div class="setting-info">
+                    <span class="setting-label">审批超时（秒）</span>
+                    <span class="setting-hint">等待用户确认的超时时间，超时后自动批准</span>
+                  </div>
+                  <input v-model.number="editableConfig.approvals.timeout" type="number" min="10" max="600" class="setting-input">
+                </div>
+              </div>
+            </div>
+
+            <!-- 操作按钮 -->
             <div class="settings-actions">
-              <button @click="saveSettings" class="btn-primary">保存设置</button>
-              <button @click="loadConfig" class="btn-ghost">重置</button>
+              <button @click="saveSettings" class="btn-primary">💾 保存设置</button>
+              <button @click="loadConfig" class="btn-ghost">↻ 重置</button>
             </div>
           </div>
 
           <!-- 日志查看 -->
           <div v-else-if="currentPage === 'logs'" class="page-logs">
             <div class="page-toolbar">
-              <select v-model="logLevel" class="filter-select">
-                <option value="">全部级别</option>
-                <option value="ERROR">ERROR</option>
-                <option value="WARN">WARN</option>
-                <option value="INFO">INFO</option>
-                <option value="DEBUG">DEBUG</option>
-              </select>
-              <input v-model="logSearch" type="text" placeholder="搜索日志..." class="search-input">
-              <label class="auto-scroll-label">
-                <input v-model="autoScroll" type="checkbox"> 自动滚动
-              </label>
-              <button @click="loadLogs" class="btn-ghost">刷新</button>
+              <div class="log-filters">
+                <select v-model="logLevel" class="filter-select">
+                  <option value="">全部级别</option>
+                  <option value="ERROR">ERROR</option>
+                  <option value="WARN">WARN</option>
+                  <option value="INFO">INFO</option>
+                  <option value="DEBUG">DEBUG</option>
+                </select>
+                <input v-model="logSearch" type="text" placeholder="搜索日志..." class="search-input">
+              </div>
+              <div class="log-actions">
+                <label class="auto-scroll-label">
+                  <input v-model="autoScroll" type="checkbox"> 自动滚动
+                </label>
+                <span class="log-count" v-if="filteredLogs.length">{{ filteredLogs.length }} 条</span>
+                <button @click="loadLogs" class="btn-ghost">刷新</button>
+              </div>
             </div>
             <div class="log-viewer" ref="logViewer">
-              <div v-for="(log, i) in filteredLogs" :key="i" class="log-entry" :class="'log-' + log.level.toLowerCase()">
+              <div v-for="(log, i) in filteredLogs" :key="i" class="log-entry" :class="'log-' + (log.level || 'info').toLowerCase()">
                 <span class="log-time">{{ log.time }}</span>
-                <span class="log-level">{{ log.level }}</span>
-                <span class="log-message">{{ log.msg }}</span>
+                <span class="log-level">{{ (log.level || 'INFO').slice(0, 4) }}</span>
+                <span class="log-message" v-html="highlightLogMsg(log.msg)"></span>
               </div>
               <div v-if="!filteredLogs.length" class="empty-state">
                 <p>暂无日志数据</p>
@@ -473,96 +753,154 @@
 
           <!-- 系统监控 -->
           <div v-else-if="currentPage === 'monitor'" class="page-monitor">
-            <div class="monitor-grid">
-              <div class="monitor-card">
-                <h3>CPU 使用率</h3>
-                <div class="monitor-value">{{ systemInfo.cpu_percent || 0 }}%</div>
-                <div class="monitor-bar">
-                  <div class="bar-fill" :style="{ width: (systemInfo.cpu_percent || 0) + '%' }" :class="getBarColor(systemInfo.cpu_percent)"></div>
+            <!-- Hermes 监控指标 -->
+            <div class="monitor-section">
+              <h2 class="monitor-section-title">Hermes 指标</h2>
+              <div class="monitor-stats-grid">
+                <div class="monitor-stat-card">
+                  <div class="monitor-stat-icon" style="background: rgba(16,185,129,0.1);">
+                    <span>⚡</span>
+                  </div>
+                  <div class="monitor-stat-content">
+                    <div class="monitor-stat-value" :class="gatewayRunning ? 'text-green' : 'text-red'">
+                      {{ gatewayRunning ? '运行中' : '已停止' }}
+                    </div>
+                    <div class="monitor-stat-label">Gateway 状态</div>
+                  </div>
                 </div>
-              </div>
-              <div class="monitor-card">
-                <h3>内存使用率</h3>
-                <div class="monitor-value">{{ systemInfo.mem_percent || 0 }}%</div>
-                <div class="monitor-bar">
-                  <div class="bar-fill" :style="{ width: (systemInfo.mem_percent || 0) + '%' }" :class="getBarColor(systemInfo.mem_percent)"></div>
+                <div class="monitor-stat-card">
+                  <div class="monitor-stat-icon" style="background: rgba(59,130,246,0.1);">
+                    <span>💬</span>
+                  </div>
+                  <div class="monitor-stat-content">
+                    <div class="monitor-stat-value">{{ sessions.length || 0 }}</div>
+                    <div class="monitor-stat-label">活跃会话</div>
+                  </div>
                 </div>
-                <div class="monitor-detail">{{ systemInfo.mem_used || 0 }} / {{ systemInfo.mem_total || 0 }} GB</div>
-              </div>
-              <div class="monitor-card">
-                <h3>磁盘使用率</h3>
-                <div class="monitor-value">{{ systemInfo.disk_percent || 0 }}%</div>
-                <div class="monitor-bar">
-                  <div class="bar-fill" :style="{ width: (systemInfo.disk_percent || 0) + '%' }" :class="getBarColor(systemInfo.disk_percent)"></div>
+                <div class="monitor-stat-card">
+                  <div class="monitor-stat-icon" style="background: rgba(245,158,11,0.1);">
+                    <span>⏰</span>
+                  </div>
+                  <div class="monitor-stat-content">
+                    <div class="monitor-stat-value">{{ cronJobs.length || 0 }}</div>
+                    <div class="monitor-stat-label">定时任务</div>
+                  </div>
                 </div>
-                <div class="monitor-detail">{{ systemInfo.disk_used || 0 }} / {{ systemInfo.disk_total || 0 }} GB</div>
-              </div>
-              <div class="monitor-card">
-                <h3>系统运行时间</h3>
-                <div class="monitor-value uptime">{{ systemInfo.uptime || '未知' }}</div>
+                <div class="monitor-stat-card">
+                  <div class="monitor-stat-icon" style="background: rgba(139,92,246,0.1);">
+                    <span>🧩</span>
+                  </div>
+                  <div class="monitor-stat-content">
+                    <div class="monitor-stat-value">{{ skills.length || 0 }}</div>
+                    <div class="monitor-stat-label">已安装技能</div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="chart-card" style="margin-top: 1.5rem;">
-              <h3>CPU / 内存趋势</h3>
-              <div ref="monitorChartEl" class="chart-container chart-lg"></div>
+
+            <!-- NAS 资源监控 -->
+            <div class="monitor-section">
+              <h2 class="monitor-section-title">NAS 资源</h2>
+              <div class="monitor-grid">
+                <div class="monitor-card">
+                  <div class="monitor-card-head">
+                    <span class="monitor-card-icon">🖥️</span>
+                    <span class="monitor-card-label">CPU 使用率</span>
+                  </div>
+                  <div class="monitor-value">{{ systemInfo.cpu_percent || 0 }}%</div>
+                  <div class="monitor-bar">
+                    <div class="bar-fill" :style="{ width: (systemInfo.cpu_percent || 0) + '%' }" :class="getBarColor(systemInfo.cpu_percent)"></div>
+                  </div>
+                </div>
+                <div class="monitor-card">
+                  <div class="monitor-card-head">
+                    <span class="monitor-card-icon">📊</span>
+                    <span class="monitor-card-label">内存使用率</span>
+                  </div>
+                  <div class="monitor-value">{{ systemInfo.mem_percent || 0 }}%</div>
+                  <div class="monitor-bar">
+                    <div class="bar-fill" :style="{ width: (systemInfo.mem_percent || 0) + '%' }" :class="getBarColor(systemInfo.mem_percent)"></div>
+                  </div>
+                  <div class="monitor-detail">{{ systemInfo.mem_used || 0 }} / {{ systemInfo.mem_total || 0 }} GB</div>
+                </div>
+                <div class="monitor-card">
+                  <div class="monitor-card-head">
+                    <span class="monitor-card-icon">💾</span>
+                    <span class="monitor-card-label">磁盘使用率</span>
+                  </div>
+                  <div class="monitor-value">{{ systemInfo.disk_percent || 0 }}%</div>
+                  <div class="monitor-bar">
+                    <div class="bar-fill" :style="{ width: (systemInfo.disk_percent || 0) + '%' }" :class="getBarColor(systemInfo.disk_percent)"></div>
+                  </div>
+                  <div class="monitor-detail">{{ systemInfo.disk_used || 0 }} / {{ systemInfo.disk_total || 0 }} GB</div>
+                </div>
+                <div class="monitor-card">
+                  <div class="monitor-card-head">
+                    <span class="monitor-card-icon">⏱️</span>
+                    <span class="monitor-card-label">系统运行时间</span>
+                  </div>
+                  <div class="monitor-value uptime">{{ systemInfo.uptime || '未知' }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 趋势图 -->
+            <div class="monitor-section">
+              <div class="chart-card">
+                <h3>CPU / 内存趋势</h3>
+                <div ref="monitorChartEl" class="chart-container chart-lg"></div>
+              </div>
             </div>
           </div>
 
           <!-- 插件管理 -->
           <div v-else-if="currentPage === 'plugins'" class="page-plugins">
+            <!-- 顶部工具栏 -->
             <div class="page-toolbar">
-              <select v-model="pluginTypeFilter" class="filter-select">
-                <option value="">全部类型</option>
-                <option value="mcp">MCP 服务器</option>
-                <option value="mcp_native">原生 MCP</option>
-                <option value="toolset">内置工具集</option>
-                <option value="platform_toolset">平台工具集</option>
-              </select>
-              <input v-model="pluginSearch" type="text" placeholder="搜索插件..." class="search-input">
-              <button @click="loadPlugins" class="btn-ghost">刷新</button>
-            </div>
-
-            <!-- 插件统计 -->
-            <div class="plugin-stats">
-              <div class="plugin-stat-item">
-                <span class="plugin-stat-value">{{ plugins.length }}</span>
-                <span class="plugin-stat-label">总数</span>
+              <div class="plugin-filter-tabs">
+                <button :class="['filter-tab', { active: !pluginTypeFilter }]" @click="pluginTypeFilter = ''">
+                  全部 <span class="tab-count">{{ plugins.length }}</span>
+                </button>
+                <button :class="['filter-tab', { active: pluginTypeFilter === 'mcp' || pluginTypeFilter === 'mcp_native' }]" @click="pluginTypeFilter = 'mcp'">
+                  🔌 MCP <span class="tab-count">{{ plugins.filter(p => p.type === 'mcp' || p.type === 'mcp_native').length }}</span>
+                </button>
+                <button :class="['filter-tab', { active: pluginTypeFilter === 'toolset' }]" @click="pluginTypeFilter = 'toolset'">
+                  🛠️ 内置工具集 <span class="tab-count">{{ plugins.filter(p => p.type === 'toolset').length }}</span>
+                </button>
+                <button :class="['filter-tab', { active: pluginTypeFilter === 'platform_toolset' }]" @click="pluginTypeFilter = 'platform_toolset'">
+                  📡 平台工具集 <span class="tab-count">{{ plugins.filter(p => p.type === 'platform_toolset').length }}</span>
+                </button>
               </div>
-              <div class="plugin-stat-item">
-                <span class="plugin-stat-value">{{ plugins.filter(p => p.enabled).length }}</span>
-                <span class="plugin-stat-label">已启用</span>
-              </div>
-              <div class="plugin-stat-item">
-                <span class="plugin-stat-value">{{ plugins.filter(p => p.type === 'mcp' || p.type === 'mcp_native').length }}</span>
-                <span class="plugin-stat-label">MCP 服务器</span>
-              </div>
-              <div class="plugin-stat-item">
-                <span class="plugin-stat-value">{{ plugins.filter(p => p.type === 'toolset' || p.type === 'platform_toolset').length }}</span>
-                <span class="plugin-stat-label">工具集</span>
+              <div class="toolbar-right">
+                <input v-model="pluginSearch" type="text" placeholder="搜索插件名称或描述..." class="search-input">
+                <button @click="loadPlugins" class="btn-ghost">↻ 刷新</button>
               </div>
             </div>
 
             <!-- 插件列表 -->
-            <div class="card-grid">
-              <div v-for="plugin in filteredPlugins" :key="plugin.name + plugin.type" class="plugin-card">
-                <div class="plugin-card-header">
-                  <div class="plugin-icon">{{ getPluginIcon(plugin.type) }}</div>
-                  <div class="plugin-info">
-                    <div class="plugin-name">{{ plugin.name }}</div>
-                    <span class="badge" :class="getPluginBadgeClass(plugin.type)">{{ getPluginTypeLabel(plugin.type) }}</span>
+            <div class="card-grid plugin-grid">
+              <div v-for="plugin in filteredPlugins" :key="plugin.name + plugin.type" class="plugin-card" @click="openPluginDetail(plugin)">
+                <div class="plugin-card-top">
+                  <div class="plugin-icon-wrap" :class="getPluginBadgeClass(plugin.type)">
+                    <span class="plugin-icon">{{ getPluginIcon(plugin.type) }}</span>
                   </div>
-                  <div class="plugin-status" :class="plugin.enabled ? 'enabled' : 'disabled'">
-                    {{ plugin.enabled ? '✓ 已启用' : '○ 已禁用' }}
+                  <div class="plugin-toggle-wrap" @click.stop>
+                    <label class="toggle-switch" :title="plugin.enabled ? '已启用' : '已禁用'">
+                      <input type="checkbox" :checked="plugin.enabled" @change="togglePlugin(plugin)">
+                      <span class="toggle-slider"></span>
+                    </label>
                   </div>
+                </div>
+                <div class="plugin-card-body">
+                  <div class="plugin-name">{{ plugin.name }}</div>
+                  <span class="badge" :class="getPluginBadgeClass(plugin.type)">{{ getPluginTypeLabel(plugin.type) }}</span>
                 </div>
                 <p class="plugin-desc">{{ plugin.description }}</p>
-                <div class="plugin-meta" v-if="plugin.command || plugin.platform">
-                  <span v-if="plugin.command" class="plugin-meta-item mono-text">{{ plugin.command }}</span>
-                  <span v-if="plugin.platform" class="plugin-meta-item">{{ plugin.platform }}</span>
-                  <span v-if="plugin.transport" class="plugin-meta-item">{{ plugin.transport }}</span>
-                </div>
-                <div class="plugin-source">
-                  <span class="badge badge-gray">{{ plugin.source === 'system' ? '系统内置' : '配置文件' }}</span>
+                <div class="plugin-card-footer">
+                  <span class="plugin-source-tag" :class="plugin.enabled ? 'tag-enabled' : 'tag-disabled'">
+                    {{ plugin.enabled ? '✓ 运行中' : '○ 已禁用' }}
+                  </span>
+                  <span v-if="plugin.source" class="plugin-origin">{{ plugin.source === 'system' ? '系统内置' : '配置文件' }}</span>
                 </div>
               </div>
               <div v-if="!filteredPlugins.length" class="empty-state">
@@ -570,6 +908,59 @@
                 <h3>暂无插件数据</h3>
                 <p v-if="pluginSearch || pluginTypeFilter">尝试调整搜索条件</p>
                 <p v-else>未检测到已配置的插件或工具集</p>
+              </div>
+            </div>
+
+            <!-- 插件详情弹窗 -->
+            <div v-if="selectedPlugin" class="confirm-overlay" @click.self="selectedPlugin = null">
+              <div class="plugin-detail-modal">
+                <div class="plugin-detail-header">
+                  <div class="plugin-detail-title-row">
+                    <div class="plugin-detail-icon" :class="getPluginBadgeClass(selectedPlugin.type)">
+                      {{ getPluginIcon(selectedPlugin.type) }}
+                    </div>
+                    <div>
+                      <h3>{{ selectedPlugin.name }}</h3>
+                      <span class="badge" :class="getPluginBadgeClass(selectedPlugin.type)">{{ getPluginTypeLabel(selectedPlugin.type) }}</span>
+                    </div>
+                  </div>
+                  <button @click="selectedPlugin = null" class="btn-close">✕</button>
+                </div>
+                <div class="plugin-detail-body">
+                  <div class="detail-section">
+                    <div class="detail-label">状态</div>
+                    <div class="detail-value">
+                      <span class="plugin-status" :class="selectedPlugin.enabled ? 'enabled' : 'disabled'">
+                        {{ selectedPlugin.enabled ? '✓ 已启用' : '○ 已禁用' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="detail-section">
+                    <div class="detail-label">描述</div>
+                    <div class="detail-value">{{ selectedPlugin.description || '暂无描述' }}</div>
+                  </div>
+                  <div class="detail-section" v-if="selectedPlugin.command">
+                    <div class="detail-label">启动命令</div>
+                    <div class="detail-value mono-text">{{ selectedPlugin.command }}</div>
+                  </div>
+                  <div class="detail-section" v-if="selectedPlugin.transport">
+                    <div class="detail-label">传输方式</div>
+                    <div class="detail-value">{{ selectedPlugin.transport }}</div>
+                  </div>
+                  <div class="detail-section" v-if="selectedPlugin.platform">
+                    <div class="detail-label">平台</div>
+                    <div class="detail-value">{{ selectedPlugin.platform }}</div>
+                  </div>
+                  <div class="detail-section">
+                    <div class="detail-label">来源</div>
+                    <div class="detail-value">{{ selectedPlugin.source === 'system' ? '系统内置' : '配置文件' }}</div>
+                  </div>
+                </div>
+                <div class="plugin-detail-footer">
+                  <button @click="togglePlugin(selectedPlugin)" class="btn-sm" :class="selectedPlugin.enabled ? 'btn-warning' : 'btn-success'">
+                    {{ selectedPlugin.enabled ? '⏸ 禁用' : '▶ 启用' }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -663,8 +1054,8 @@
     </div>
   </div>
 
-  <script src="js/utils.js?v=2"></script>
+  <script src="js/utils.js?v=3"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/app.js?v=2"></script>
+  <script src="js/app.js?v=4"></script>
 </body>
 </html>

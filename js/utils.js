@@ -96,12 +96,53 @@ const Utils = {
   },
 
   /**
+   * 渠道描述
+   */
+  getChannelDescription(name) {
+    const descriptions = {
+      feishu: '企业协作平台，支持群聊、单聊、机器人消息',
+      lark: '企业协作平台（国际版），支持群聊、单聊、机器人消息',
+      telegram: '即时通讯应用，支持 Bot API 消息收发',
+      discord: '社区聊天平台，支持频道消息和机器人交互',
+      slack: '团队协作平台，支持频道消息和 App 集成',
+      whatsapp: '全球即时通讯应用，支持 Business API',
+      dingtalk: '企业办公平台，支持群聊机器人消息',
+      wecom: '企业内部沟通工具，支持应用消息推送',
+      wechat: '个人即时通讯应用',
+      email: '电子邮件收发，支持 IMAP/SMTP 协议',
+      signal: '加密即时通讯应用',
+      matrix: '去中心化通讯协议',
+      sms: '短信收发服务',
+      webchat: '网页嵌入式聊天组件',
+      api: 'HTTP API 接口',
+      webhook: 'Webhook 回调通知',
+    };
+    const lower = (name || '').toLowerCase();
+    for (const [key, desc] of Object.entries(descriptions)) {
+      if (lower.includes(key)) return desc;
+    }
+    return '';
+  },
+
+  /**
    * 获取柱状图颜色
    */
   getBarColor(percent) {
     if (percent >= 90) return 'bar-red';
     if (percent >= 70) return 'bar-yellow';
     return 'bar-green';
+  },
+
+  /**
+   * 高亮日志关键词（HTML 转义后高亮）
+   */
+  highlightLogMsg(msg) {
+    if (!msg) return '';
+    // HTML 转义
+    const escaped = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // 高亮关键词
+    const keywords = /(错误|异常|超时|失败|error|exception|timeout|failed|critical|fatal|panic)/gi;
+    return escaped.replace(keywords, '<mark class="log-highlight">$1</mark>');
   },
 
   /**

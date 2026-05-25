@@ -59,12 +59,42 @@ const app = createApp({
     // Skills
     const skills = ref([]);
     const skillSearch = ref('');
+    const skillCategoryFilter = ref('');
+    const selectedSkill = ref(null);
 
     // Config
     const appConfig = ref({});
     const editableConfig = ref({ agent: {}, display: {} });
     const switchForm = ref({ provider: '', model: '' });
     const switchResult = ref(null);
+    const customModelName = ref('');
+
+    // Provider form
+    const showProviderForm = ref(false);
+    const providerFormMode = ref('create');
+    const providerForm = ref({ name: '', base_url: '', api_key: '' });
+
+    // Known models per provider
+    const knownModels = {
+      mimo: ['mimo-v2.5-pro', 'mimo-v2.5-flash', 'mimo-v2-pro', 'mimo-v2-flash'],
+      'minimax-cn': ['abab7-chat', 'abab6.5s-chat', 'abab6.5-chat', 'abab5.5-chat'],
+      openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo', 'o1-preview', 'o1-mini', 'o3-mini'],
+      anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229'],
+      deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
+      google: ['gemini-2.0-flash', 'gemini-2.0-pro', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+      qwen: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long'],
+    };
+
+    // Known provider URLs for hints
+    const providerUrlHints = {
+      openai: 'https://api.openai.com/v1',
+      anthropic: 'https://api.anthropic.com',
+      deepseek: 'https://api.deepseek.com',
+      google: 'https://generativelanguage.googleapis.com/v1beta',
+      qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      mimo: 'https://api.xiaomi.com/v1',
+      'minimax-cn': 'https://api.minimax.chat/v1',
+    };
 
     // Logs
     const logEntries = ref([]);
@@ -81,6 +111,7 @@ const app = createApp({
     const plugins = ref([]);
     const pluginSearch = ref('');
     const pluginTypeFilter = ref('');
+    const selectedPlugin = ref(null);
 
     // Confirm dialog
     const showConfirm = ref(false);
@@ -200,6 +231,7 @@ const app = createApp({
         editableConfig.value = {
           agent: { ...(config.agent || {}) },
           display: { ...(config.display || {}) },
+          approvals: { ...(config.approvals || {}) },
         };
         configModels.value = [];
         if (config.model?.default) configModels.value.push(config.model.default);
@@ -211,13 +243,23 @@ const app = createApp({
 
     async function switchModel() {
       switchResult.value = null;
+      const provider = switchForm.value.provider;
+      let model = switchForm.value.model;
+      if (model === '__custom__') {
+        model = customModelName.value.trim();
+        if (!model) {
+          toast('请输入自定义模型名称', 'error');
+          return;
+        }
+      }
       try {
-        const result = await HermesAPI.switchModel(switchForm.value.provider, switchForm.value.model);
+        const result = await HermesAPI.switchModel(provider, model);
         if (result.ok) {
           switchResult.value = { ok: true };
-          toast('模型已切换', 'success');
+          toast(`已切换到 ${model}`, 'success');
           await loadConfig(); // Refresh config
           switchForm.value = { provider: '', model: '' };
+          customModelName.value = '';
         } else {
           switchResult.value = { ok: false, error: result.error || '切换失败' };
         }
@@ -682,13 +724,28 @@ const app = createApp({
     });
 
     const filteredSkills = computed(() => {
-      if (!skillSearch.value) return skills.value;
-      const q = skillSearch.value.toLowerCase();
-      return skills.value.filter(s =>
-        (s.name || '').toLowerCase().includes(q) ||
-        (s.description || '').toLowerCase().includes(q)
-      );
+      let result = skills.value;
+      if (skillCategoryFilter.value) {
+        result = result.filter(s => (s.category || '通用') === skillCategoryFilter.value);
+      }
+      if (skillSearch.value) {
+        const q = skillSearch.value.toLowerCase();
+        result = result.filter(s =>
+          (s.name || '').toLowerCase().includes(q) ||
+          (s.description || '').toLowerCase().includes(q)
+        );
+      }
+      return result;
     });
+
+    const skillCategories = computed(() => {
+      const cats = new Set(skills.value.map(s => s.category || '通用'));
+      return [...cats].sort();
+    });
+
+    function openSkillDetail(skill) {
+      selectedSkill.value = skill;
+    }
 
     const filteredLogs = computed(() => {
       let logs = logEntries.value;
@@ -702,10 +759,146 @@ const app = createApp({
       return logs;
     });
 
+    // Model suggestions based on selected provider
+    const modelSuggestions = computed(() => {
+      const provider = switchForm.value.provider;
+      if (!provider) return [];
+      // Check known models first
+      if (knownModels[provider]) return knownModels[provider];
+      // Fallback: try to extract from provider config
+      const conf = appConfig.value.providers?.[provider];
+      if (conf?.models && Array.isArray(conf.models)) return conf.models;
+      return [];
+    });
+
+    function onProviderChange() {
+      switchForm.value.model = '';
+      customModelName.value = '';
+      switchResult.value = null;
+    }
+
+    function onModelSelectChange() {
+      switchResult.value = null;
+      if (switchForm.value.model !== '__custom__') {
+        customModelName.value = '';
+      }
+    }
+
+    function isKnownModel(name) {
+      const provider = switchForm.value.provider;
+      if (!provider) return false;
+      const models = knownModels[provider] || appConfig.value.providers?.[provider]?.models || [];
+      return models.includes(name);
+    }
+
+    function selectProvider(name) {
+      switchForm.value.provider = name;
+      switchForm.value.model = '';
+      customModelName.value = '';
+      switchResult.value = null;
+    }
+
+    async function quickSwitchModel(provider, model) {
+      switchForm.value.provider = provider;
+      switchForm.value.model = model;
+      customModelName.value = '';
+      // Immediately switch
+      await switchModel();
+    }
+
+    function getProviderIcon(name) {
+      const icons = {
+        openai: '🟢', anthropic: '🟠', deepseek: '🔵', google: '🔴',
+        qwen: '🟣', mimo: '⚡', 'minimax-cn': '🟡',
+      };
+      return icons[name] || '🔧';
+    }
+
+    function getProviderUrlHint(name) {
+      return providerUrlHints[name] || '';
+    }
+
+    // Available providers (not yet configured)
+    const availableProviders = computed(() => {
+      const configured = Object.keys(appConfig.value.providers || {});
+      return Object.keys(knownModels).filter(p => !configured.includes(p));
+    });
+
+    // Can switch model?
+    const canSwitchModel = computed(() => {
+      if (!switchForm.value.provider) return false;
+      if (switchForm.value.model === '__custom__') return !!customModelName.value.trim();
+      return !!switchForm.value.model;
+    });
+
+    // Provider management
+    function openProviderForm(mode, name = '', conf = {}) {
+      providerFormMode.value = mode;
+      providerForm.value = {
+        name: name,
+        base_url: conf.base_url || '',
+        api_key: conf.api_key || '',
+      };
+      showProviderForm.value = true;
+    }
+
+    async function submitProviderForm() {
+      const form = providerForm.value;
+      if (!form.name.trim()) {
+        toast('提供商名称不能为空', 'error');
+        return;
+      }
+      try {
+        const config = { ...appConfig.value };
+        if (!config.providers) config.providers = {};
+        config.providers[form.name] = {
+          base_url: form.base_url || undefined,
+          api_key: form.api_key || undefined,
+        };
+        await HermesAPI.updateConfig(config);
+        toast(providerFormMode.value === 'create' ? '提供商已添加' : '提供商已更新', 'success');
+        showProviderForm.value = false;
+        await loadConfig();
+      } catch (err) {
+        toast('操作失败: ' + err.message, 'error');
+      }
+    }
+
+    function confirmDeleteProvider(name) {
+      confirmIcon.value = '🗑️';
+      confirmTitle.value = '删除提供商';
+      confirmMsg.value = `确认要删除提供商「${name}」吗？此操作不可撤销。`;
+      confirmAction = () => deleteProvider(name);
+      showConfirm.value = true;
+    }
+
+    async function deleteProvider(name) {
+      try {
+        const config = { ...appConfig.value };
+        if (config.providers) {
+          delete config.providers[name];
+        }
+        await HermesAPI.updateConfig(config);
+        toast('提供商已删除', 'success');
+        if (switchForm.value.provider === name) {
+          switchForm.value.provider = '';
+          switchForm.value.model = '';
+        }
+        await loadConfig();
+      } catch (err) {
+        toast('删除失败: ' + err.message, 'error');
+      }
+    }
+
     const filteredPlugins = computed(() => {
       let result = plugins.value;
       if (pluginTypeFilter.value) {
-        result = result.filter(p => p.type === pluginTypeFilter.value);
+        if (pluginTypeFilter.value === 'mcp') {
+          // MCP tab matches both mcp and mcp_native
+          result = result.filter(p => p.type === 'mcp' || p.type === 'mcp_native');
+        } else {
+          result = result.filter(p => p.type === pluginTypeFilter.value);
+        }
       }
       if (pluginSearch.value) {
         const q = pluginSearch.value.toLowerCase();
@@ -760,6 +953,19 @@ const app = createApp({
       return classes[type] || 'badge-gray';
     }
 
+    function openPluginDetail(plugin) {
+      selectedPlugin.value = plugin;
+    }
+
+    function togglePlugin(plugin) {
+      plugin.enabled = !plugin.enabled;
+      toast(plugin.enabled ? `已启用 ${plugin.name}` : `已禁用 ${plugin.name}`, plugin.enabled ? 'success' : 'info');
+      // If toggled from detail modal, update reference
+      if (selectedPlugin.value && selectedPlugin.value.name === plugin.name) {
+        selectedPlugin.value = { ...plugin };
+      }
+    }
+
     // ===== Lifecycle =====
     onMounted(() => {
       // Apply saved theme
@@ -802,13 +1008,19 @@ const app = createApp({
       selectedSession, sessionMessages, sessionLoading, sessionTotal, sessionDetailTitle, openSessionDetail, refreshSessionDetail,
       cronJobs, loadCronJobs, toggleCron, runCron, deleteCron, confirmDeleteCron,
       showCronForm, cronFormMode, cronForm, cronFormSubmitting, openCronForm, resetCronForm, submitCronForm,
-      skills, skillSearch, filteredSkills, loadSkills,
+      skills, skillSearch, filteredSkills, loadSkills, skillCategoryFilter, skillCategories, selectedSkill, openSkillDetail,
       appConfig, switchForm, switchResult, switchModel,
+      modelSuggestions, onProviderChange, customModelName, knownModels,
+      onModelSelectChange, isKnownModel, canSwitchModel,
+      selectProvider, quickSwitchModel, getProviderIcon,
+      availableProviders, getProviderUrlHint,
+      showProviderForm, providerFormMode, providerForm, openProviderForm, submitProviderForm, confirmDeleteProvider,
       editableConfig, saveSettings, loadConfig,
       logEntries, filteredLogs, logLevel, logSearch, autoScroll, loadLogs, logViewer,
       systemInfo, monitorChartEl,
       monitorCpuData, monitorMemData,
       plugins, pluginSearch, pluginTypeFilter, filteredPlugins, loadPlugins,
+      selectedPlugin, openPluginDetail, togglePlugin,
       getPluginIcon, getPluginTypeLabel, getPluginBadgeClass,
       toasts, refreshData,
       formatTime: Utils.formatTime,
@@ -816,7 +1028,9 @@ const app = createApp({
       describeCron: Utils.describeCron,
       getChannelIcon: Utils.getChannelIcon,
       getChannelLabel: Utils.getChannelLabel,
+      getChannelDescription: Utils.getChannelDescription,
       getBarColor: Utils.getBarColor,
+      highlightLogMsg: Utils.highlightLogMsg,
       officialConsoleUrl,
       confirmRestartGateway, startGateway,
       showConfirm, confirmIcon, confirmTitle, confirmMsg,

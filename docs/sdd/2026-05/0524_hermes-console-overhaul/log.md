@@ -1,125 +1,116 @@
 # LOG — Hermes 控制台全面重构
 
-## 进度总览
+## 2026-05-25
 
-| 任务 | 状态 | 开始时间 | 完成时间 | 备注 |
-|------|------|----------|----------|------|
-| T1 | ✅ | 2026-05-24 18:12 | 2026-05-24 18:15 | v-cloak + CSS |
-| T2 | ✅ | 2026-05-24 18:15 | 2026-05-24 18:16 | 修改 officialConsoleUrl |
-| T3 | ✅ | 2026-05-24 18:16 | 2026-05-24 18:18 | Dashboard redesign |
-| T4 | ✅ | 2026-05-24 18:18 | 2026-05-24 18:22 | Vercel-style CSS vars |
-| T5 | ✅ | 2026-05-24 18:43 | 2026-05-24 18:52 | Table CSS fix + Linear style |
-| T6 | ✅ | 2026-05-24 18:52 | 2026-05-24 18:58 | Session detail with message bubbles |
-| T7 | ✅ | 2026-05-24 19:17 | 2026-05-24 19:23 | Inline edit with PUT API |
-| T8 | ✅ | 2026-05-24 19:24 | 2026-05-24 19:26 | Confirm dialog before delete |
-| T9 | ✅ | 2026-05-24 19:46 | 2026-05-24 19:55 | Cron jobs list with rich metadata |
-| T10 | ✅ | 2026-05-24 22:38 | 2026-05-24 22:44 | 1 行路由修复 |
-| T11 | ✅ | 2026-05-24 22:45 | 2026-05-24 22:48 | All features pre-existing, verified |
-| T12 | ⬜ | - | - | |
-| T13 | ⬜ | - | - | |
-| T14 | ⬜ | - | - | |
-| T15 | ⬜ | - | - | |
-| T16 | ⬜ | - | - | |
-| T17 | ⬜ | - | - | |
-| T18 | ⬜ | - | - | |
-| T19 | ⬜ | - | - | |
-| T20 | ⬜ | - | - | |
+### T20: 最终验收 — 全部 AC 验证 ✅
 
-## 执行记录
+**验收结果**：AC1-AC14 全部通过
 
-### 2026-05-24 创建项目
-- 创建 SDD 文档（proposal/spec/tasks/log）
-- 创建定时任务（每 20 分钟）
+| AC | 测试项 | 结果 | 说明 |
+|---|---|---|---|
+| AC1 | 首次访问无弹窗 | ✅ | 直接显示仪表盘，0 个模态框 |
+| AC2 | 官方控制台链接 | ✅ | 指向 http://192.168.5.110:19119/login |
+| AC3 | 会话列表 | ✅ | 50 个会话，ID 完整可见，搜索/分页可用 |
+| AC4 | 会话详情 | ✅ | 显示 84 条消息，有返回按钮 |
+| AC5 | 会话重命名 | ✅ | inline-edit 模式（textbox + ✓/✕） |
+| AC6 | 创建定时任务 | ✅ | "＋ 创建任务"按钮可用 |
+| AC7 | 编辑定时任务 | ✅ | "✏️ 编辑"按钮，预填数据 |
+| AC8 | 删除定时任务 | ✅ | "🗑 删除"按钮，有确认弹窗 |
+| AC9 | 模型配置切换 | ✅ | 提供商下拉 + 模型名称输入 |
+| AC10 | 消息渠道 | ✅ | "飞书"中文名 + 🐦 图标 + 状态 |
+| AC11 | 浅色主题 | ✅ | 默认浅色，bg=#fafafa, text=#171717 |
+| AC12 | 深色主题 | ✅ | bg=#0a0a0a, text=#ededed |
+| AC13 | 移动端访问 | ✅ | mobile-header + hamburger + sidebar drawer |
+| AC14 | Gateway 控制 | ✅ | dot-on + 🔄 重启按钮 |
 
-### 2026-05-24 T1 完成
-- **T1**: 修复首次加载问题
-- 改动：index.html 添加 `v-cloak` 属性到 `#app`；css/main.css 添加 `[v-cloak] { display: none !important; }`
-- 验证：浏览器访问无原始模板语法显示，无 JS 错误
+### T19: 移动端响应式适配 ✅
 
-### 2026-05-24 T2 完成
-- **T2**: 修正官方控制台链接
-- 改动：js/app.js 修改 `officialConsoleUrl` 为 `http://192.168.5.110:19119/login`
-- 验证：浏览器链接指向正确
+**改动摘要**：
 
-### 2026-05-24 T3 完成
-- **T3**: 重构仪表盘 UI
-- 改动：
-  - index.html: 重构 stat-card（图标+背景色）、info-card-header（标题+计数）、渠道显示（中文名+图标+状态徽章）、日志级别徽章
-  - css/main.css: shadow-as-border 卡片样式、stat-icon-wrap、info-card-header、channel-status-badge、log-level-badge
-  - js/app.js: loadDashboardStats 添加 iconBg、getChannelLabel
-  - js/utils.js: 添加 getChannelLabel 函数、扩展 getChannelIcon
-- 验证：仪表盘显示正确，飞书显示中文名，日志有级别徽章
+1. **css/main.css** — 新增 tablet 断点 + 全面扩展移动端样式（约 145 行新增 CSS）
+   - 新增 `@media (max-width: 900px)` tablet 断点：模型英雄区堆叠、技能分类标签横向滚动、插件工具栏允许换行
+   - `@media (max-width: 768px)` 移动端断点全面扩展：
+     - 安全区域适配 `env(safe-area-inset-*)` 支持 iOS 刘海屏
+     - `100dvh` 替代 `100vh` 解决 iOS Safari 地址栏遮挡问题
+     - `overflow-x: hidden` 防止水平溢出
+     - 顶部栏操作按钮紧凑化（`.btn-ghost` 隐藏文字仅显示图标）
+     - 按钮最小触摸目标 `min-height: 36-44px`
+     - 模型英雄区垂直堆叠、提供商卡片操作始终可见（`opacity: 1`）
+     - 渠道卡片、技能卡片、Cron 卡片间距优化
+     - 会话详情消息头堆叠、消息间距优化
+     - 日志查看器字体缩小、时间戳/级别列压缩
+     - 设置页全宽输入框、卡片纵向堆叠
+     - 所有弹窗适配宽度（确认、插件详情、技能详情、Cron 表单）
+     - Toast 全宽显示
+     - 表单输入框 `font-size: 1rem` 防止 iOS 自动缩放
+     - Toggle 开关增大触摸区域（2.6rem × 1.4rem）
+     - 分页控件紧凑化、`model-info-grid` 单列
+   - `@media (max-width: 480px)` 小屏断点增强：所有网格单列、卡片进一步紧凑、顶部栏高度缩减至 48px
 
-### 2026-05-24 T4 完成
-- **T4**: 浅色/深色主题基础适配
-- 改动：
-  - css/main.css: 更新 CSS 变量为 Vercel 风格（#ffffff/#171717/#fafafa 等），shadow-as-border，移除 --accent 紫色
-  - js/app.js: 更新 ECharts 颜色跟随新主题，图表颜色改为蓝色
-  - index.html: 添加 Geist Sans/Mono 字体 CDN
-- 验证：页面加载正确，浅色主题默认显示
+2. **index.html** — CSS 缓存版本号 `v=6` → `v=7`
 
-### 2026-05-24 T5 完成
-- **T5**: 重构会话列表 UI — 表格样式 + 完整 ID 显示
-- 改动：
-  - css/main.css: 修复文件中嵌入行号导致的损坏（全部 CSS 规则失效），补全所有缺失样式
-  - 新增 50+ 个 CSS 规则：data-table (Linear 风格)、pagination、mono-text、empty-state、session-detail、card-grid、plugin-card、settings、monitor、toast、confirm、badge-yellow/purple、responsive 等
-  - 会话列表 table：shadow-as-border 容器、hover 高亮行 (0.12s transition)、uppercase 表头 (font-weight 500)、monospace ID (Geist Mono)、ID 列 max-width 360px + ellipsis + hover 展开
-  - 分页控件居中显示
-  - 移动端：表格水平滚动、卡片单列布局
-  - index.html: CSS 缓存版本 v=3 → v=4
-- 验证：浏览器访问 /#/sessions，50 个会话正确加载，table 样式全部生效
+**验证结果**：
+- 桌面端页面正常加载，无样式回归
+- CSS 媒体查询正确识别
+- 无 JS 错误
+- 所有断点规则结构完整
 
-### 2026-05-24 T7 完成
-- **T7**: 实现会话编辑功能 — 重命名标题
-- 改动：
-  - serve.py: 添加 `do_PUT` 方法、`update_session_title()` 函数、PUT `/api/sessions/:id` 路由、OPTIONS 允许 PUT
-  - js/api.js: 添加 `updateSession(id, title)` 方法
-  - js/app.js: 添加 `editingSessionId`、`editingSessionTitle`、`startEditSession()`、`saveEditSession()`、`cancelEditSession()` 函数
-  - index.html: 会话表格每行添加 ✏️ 编辑按钮，标题列支持 inline 编辑（input + ✓/✕ 按钮）
-  - css/main.css: 添加 `.inline-edit`、`.editing-input`、`.btn-icon`、`.btn-save`、`.btn-cancel` 样式
-- 验证：
-  - PUT API 测试：`curl -X PUT /api/sessions/xxx -d '{"title":"新标题"}'` → 200 OK
-  - 浏览器测试：点击 ✏️ → 出现 inline input → 输入新标题 → 点击 ✓ → 标题更新
-  - 会话 "session_cron_299d2374b143_20260524_191746" 成功重命名为 "我重命名的会话"
+### T16: 重构系统设置页 — 分类 + 说明 ✅
 
-### 2026-05-24 T8 完成
-- **T8**: 实现会话删除功能 — 确认弹窗
-- 改动：
-  - js/app.js: 添加 `confirmDeleteSession(id, title)` 函数，使用已有 confirm dialog 基础设施（confirmIcon/confirmTitle/confirmMsg/confirmAction/showConfirm）
-  - index.html: 删除按钮从 `deleteSession(s.id)` 改为 `confirmDeleteSession(s.id, s.title || '未命名')`
-- 验证：
-  - 点击删除按钮 → 弹出确认弹窗显示会话标题
-  - 确认后会话从列表消失，计数从 50 → 49 → 48
-  - 弹窗图标 🗑️、标题「删除会话」
+**改动摘要**：
 
-### 2026-05-24 T9 完成
-- **T9**: 实现定时任务列表 — 读取并展示 cron 数据
-- 改动：
-  - serve.py: `get_cron_jobs()` 添加 `/opt/data/cron/jobs.json` 路径；新增 `toggle_cron_job()`、`run_cron_job()`、`delete_cron_job()` 函数；API 路由调用真实实现
-  - index.html: cron 卡片展示 schedule_display、last_run_at（带成功/失败徽章）、next_run_at、deliver 渠道、last_error；空状态引导文案
-  - js/app.js: 新增 `confirmDeleteCron(job)` 函数并暴露到 return
-  - css/main.css: 新增 .cron-title-row、.cron-id、.cron-meta、.badge-xs、.empty-state-rich、.empty-hint 等样式
-- 验证：
-  - GET /api/cron 返回 2 个任务（hermes-console-dev、hermes-console-v2）
-  - POST /api/cron/:id/toggle 切换 enabled 状态并写回 jobs.json
-  - 浏览器 /#/cron 正确显示 2 个任务卡片，包含完整元数据
+1. **index.html** — 重写系统设置页面模板
+   - 三大设置分区：🤖 智能体、🎨 显示、🔐 审批
+   - 每个分区带 header（标题+描述说明）
+   - setting-card 卡片式布局（左侧信息+右侧控件）
+   - 每个设置项带 setting-hint 中文说明
+   - 新增设置项：推理深度、详细日志、紧凑模式、流式输出、显示费用、显示推理过程、审批模式、审批超时
+   - toggle switch 用于布尔值设置
 
-### 2026-05-24 T10 完成
-- **T10**: 实现创建定时任务 — 表单弹窗
-- 改动：
-  - serve.py: 修复路由 bug — `elif path == '/api/cron':` 改为 `elif path == '/api/cron' and method == 'GET':`（原 GET handler 不检查 method，导致 POST /api/cron 也被 GET handler 拦截，永远无法到达 POST handler）
-  - 前端、API、后端 create_cron_job 函数均已就绪，仅此 1 行路由修复即可
-- 验证：
-  - POST /api/cron 创建任务返回 `{ok: true, job: {...}}`
-  - GET /api/cron 仍正常返回任务列表
-  - 浏览器 /#/cron 点击"创建任务"→ 表单弹窗 → 填写名称+prompt → 点击"创建任务" → 任务出现在列表中
-  - 删除测试任务后验证正常
+2. **css/main.css** — 重写 settings 样式
+   - `.settings-section` 去掉 padding，改为 overflow:hidden
+   - `.settings-section-header` 分区标题区域
+   - `.settings-grid` / `.setting-card` 卡片式布局
+   - `.setting-info` + `.setting-hint` 信息区域
+   - 保留原有 `.setting-input` 和 `.settings-actions`
 
-### 2026-05-24 T11 完成
-- **T11**: 实现编辑/删除/执行定时任务
-- 改动：无代码修改（功能已在 T9/T10 前置任务中完整实现）
-- 验证：
-  - 编辑：点击 ✏️ → 弹窗标题"编辑定时任务"→ 预填名称/调度/prompt/渠道/状态 → "保存修改"按钮
-  - 删除：点击 🗑 → 确认弹窗 → 确认后任务消失
-  - 立即执行：点击 ⚡ → POST /api/cron/:id/run → 返回 ok: true
-  - 暂停/启用：点击 ⏸/▶ → POST /api/cron/:id/toggle → 状态切换
+3. **js/app.js** — loadConfig 增加 approvals 分区
+
+**验证结果**：
+- 页面正确显示三大分区
+- 所有设置项正确绑定到 editableConfig
+- toggle switch 渲染正确
+- 保存/重置按钮可用
+
+### T15: 重构插件管理页 — 分类 + 详情 ✅
+
+**改动摘要**：
+
+1. **index.html** — 重写插件管理页面模板
+   - 用 tab 式分类按钮（全部/MCP/内置工具集/平台工具集）替代原下拉选择
+   - 新卡片设计：图标色块包装 + toggle 开关 + 名称 badge + 描述 + 底部状态标签
+   - 点击卡片打开详情弹窗（显示类型、状态、描述、启动命令、传输方式、平台、来源）
+   - 详情弹窗底部有禁用/启用按钮
+
+2. **css/main.css** — 新增约 290 行插件相关样式
+   - `.plugin-filter-tabs` / `.filter-tab` / `.tab-count` — 筛选标签栏
+   - `.plugin-card` / `.plugin-card-top` / `.plugin-card-body` / `.plugin-card-footer` — 新卡片布局
+   - `.plugin-icon-wrap` — 图标色块（按类型着色）
+   - `.toggle-switch` / `.toggle-slider` — 自定义 toggle 开关
+   - `.plugin-detail-modal` — 详情弹窗
+   - `.btn-sm` / `.btn-warning` / `.btn-success` — 弹窗操作按钮
+   - 修复所有 `--radius-md` 引用为 `--radius`（变量未定义）
+   - 修复 `.btn-warning` 使用 `--yellow` 替代不存在的 `--warning`
+
+3. **js/app.js** — 新增插件交互逻辑
+   - `selectedPlugin` ref — 详情弹窗状态
+   - `openPluginDetail(plugin)` — 打开详情
+   - `togglePlugin(plugin)` — 切换启用/禁用 + toast 提示
+   - `filteredPlugins` computed 增强：MCP tab 同时匹配 `mcp` 和 `mcp_native` 类型
+
+**验证结果**：
+- 页面正常加载，显示 9 个插件
+- 筛选 tab 正确过滤（平台工具集 → 8 个，内置工具集 → 1 个，MCP → 0 个）
+- 点击卡片打开详情弹窗，显示完整信息
+- toggle 开关渲染正确（checkbox + slider 样式）
+- 无 JS 错误
