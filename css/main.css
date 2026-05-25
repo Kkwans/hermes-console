@@ -424,84 +424,106 @@ body {
 .badge-blue { background: var(--blue-dim); color: var(--blue); border-color: transparent; }
 .badge-gray { background: var(--bg-elevated); color: var(--text-muted); border-color: transparent; }
 
-/* ===== Status Hero Card ===== */
-.status-hero {
+/* ===== Status Card (Dashboard) ===== */
+.status-card {
   display: flex;
   align-items: center;
-  gap: 2rem;
-  padding: 1.5rem 2rem;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
   background: var(--bg-panel);
+  border: 1px solid var(--border-solid);
   border-radius: var(--radius-lg);
   margin-bottom: 1.5rem;
-  box-shadow: var(--shadow);
-  transition: box-shadow var(--transition-normal);
-  border: 1px solid var(--border);
+  transition: border-color var(--transition-normal);
 }
-.status-hero:hover {
-  box-shadow: var(--shadow-lg);
+.status-card:hover {
+  border-color: var(--text-muted);
 }
-.status-hero-left {
+.status-card-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.85rem;
   flex-shrink: 0;
 }
-.status-hero-dot {
+.status-indicator {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.status-dot-lg {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.status-hero-dot.dot-on {
+.status-dot-lg.dot-on {
   background: var(--green);
   box-shadow: 0 0 8px var(--green);
   animation: pulse-green 2s infinite;
 }
-.status-hero-dot.dot-off {
+.status-dot-lg.dot-off {
   background: var(--red);
 }
 @keyframes pulse-green {
   0%, 100% { box-shadow: 0 0 6px var(--green); }
   50% { box-shadow: 0 0 14px var(--green); }
 }
-.status-hero-state {
-  font-size: var(--text-xl);
+.status-state {
+  font-size: var(--text-lg);
   font-weight: 700;
   letter-spacing: -0.3px;
+  color: var(--text-primary);
 }
-.status-hero-label {
+.status-sub {
   font-size: var(--text-xs);
   color: var(--text-muted);
+  margin-top: 1px;
 }
-.status-hero-meta {
+.status-card-center {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
   flex: 1;
   flex-wrap: wrap;
 }
-.status-meta-item {
+.status-info-row {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 2px;
 }
-.status-meta-label {
+.status-info-label {
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.status-meta-value {
+.status-info-value {
   font-size: var(--text-sm);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-weight: 500;
   font-family: var(--font-mono);
 }
-.status-hero-actions {
+.status-card-right {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   flex-shrink: 0;
 }
+.btn-ghost-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-ghost-sm:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 /* ===== Stat Cards ===== */
 .stat-grid {
@@ -2285,17 +2307,18 @@ mark.log-highlight {
   .content-area { padding: 1rem; }
   .topbar { padding: 0 0.75rem; }
 
-  /* Status hero: stack on mobile */
-  .status-hero {
+  /* Status card: stack on mobile */
+  .status-card {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
-    padding: 1.2rem;
+    padding: 1rem 1.2rem;
   }
-  .status-hero-meta {
+  .status-card-center {
     gap: 1rem;
+    width: 100%;
   }
-  .status-hero-actions {
+  .status-card-right {
     width: 100%;
     justify-content: flex-end;
   }
