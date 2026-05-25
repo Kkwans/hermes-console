@@ -271,6 +271,9 @@ body {
 .mobile-overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.5); z-index: 99;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition: opacity 0.25s ease;
 }
 
 /* ===== Main Content ===== */
@@ -2176,6 +2179,9 @@ mark.log-highlight {
   /* Mobile header: show */
   .mobile-header { display: flex; }
 
+  /* Hide desktop topbar on mobile (mobile-header replaces it) */
+  .topbar { display: none; }
+
   /* Sidebar: off-screen drawer */
   .sidebar {
     position: fixed;
@@ -2183,8 +2189,12 @@ mark.log-highlight {
     width: 260px;
     z-index: 100;
     transition: left 0.25s ease;
+    box-shadow: none;
   }
-  .sidebar.open { left: 0; }
+  .sidebar.open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  }
   .mobile-overlay { display: block; }
 
   /* Layout: vertical stack */
