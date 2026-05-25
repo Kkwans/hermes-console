@@ -380,11 +380,10 @@ def get_skills():
 def get_system_info():
     """获取系统信息"""
     info = {}
-    # CPU
+    # CPU — 使用 /proc/stat 计算真实 CPU 使用率
     try:
-        load = os.getloadavg()
-        cpu_count = os.cpu_count() or 1
-        info['cpu_percent'] = round(load[0] / cpu_count * 100, 1)
+        cpu_pct = _calc_cpu_percent()
+        info['cpu_percent'] = cpu_pct
     except Exception:
         info['cpu_percent'] = 0
 
@@ -431,6 +430,86 @@ def get_system_info():
         info['uptime'] = '未知'
 
     return info
+
+
+# ===== CPU 使用率计算（基于 /proc/stat） =====
+
+_prev_cpu_times = None
+
+def _read_cpu_times():
+    """读取 /proc/stat 的 CPU 行，返回 (idle, total)"""
+    with open('/proc/stat') as f:
+        line = f.readline()
+    parts = line.split()
+    # cpu user nice system idle iowait irq softirq steal
+    times = list(map(int, parts[1:]))
+    idle = times[3] + (times[4] if len(times) > 4 else 0)  # idle + iowait
+    total = sum(times)
+    return idle, total
+
+def _calc_cpu_percent():
+    """通过两次采样 /proc/stat 计算 CPU 使用率百分比"""
+    global _prev_cpu_times
+    idle, total = _read_cpu_times()
+    if _prev_cpu_times is None:
+        _prev_cpu_times = (idle, total)
+        # 首次调用，用 loadavg 估算
+        try:
+            load = os.getloadavg()
+            cpu_count = os.cpu_count() or 1
+            return round(load[0] / cpu_count * 100, 1)
+        except:
+            return 0
+    prev_idle, prev_total = _prev_cpu_times
+    _prev_cpu_times = (idle, total)
+    d_idle = idle - prev_idle
+    d_total = total - prev_total
+    if d_total <= 0:
+        return 0
+    return round((1 - d_idle / d_total) * 100, 1)
+
+
+# ===== 监控历史数据 (环形缓冲，最近 60 个数据点) =====
+
+import threading
+import time as _time
+
+_monitor_lock = threading.Lock()
+_cpu_history = []   # [{time, value}]
+_mem_history = []   # [{time, value}]
+_max_history = 60
+
+def _monitor_collector():
+    """后台线程：每 10 秒采集一次 CPU/内存数据"""
+    while True:
+        try:
+            info = get_system_info()
+            now = _time.strftime('%H:%M:%S')
+            with _monitor_lock:
+                _cpu_history.append({'time': now, 'value': info.get('cpu_percent', 0)})
+                _mem_history.append({'time': now, 'value': info.get('mem_percent', 0)})
+                if len(_cpu_history) > _max_history:
+                    _cpu_history.pop(0)
+                if len(_mem_history) > _max_history:
+                    _mem_history.pop(0)
+        except Exception:
+            pass
+        _time.sleep(10)
+
+# 启动后台采集线程
+_monitor_thread = threading.Thread(target=_monitor_collector, daemon=True)
+_monitor_thread.start()
+
+
+def get_cpu_history():
+    """获取 CPU 历史数据"""
+    with _monitor_lock:
+        return list(_cpu_history)
+
+def get_mem_history():
+    """获取内存历史数据"""
+    with _monitor_lock:
+        return list(_mem_history)
 
 def get_plugins():
     """读取已安装的插件（MCP servers + 工具集）"""
@@ -687,6 +766,10 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
                 self._json({'skills': get_skills()})
             elif path == '/api/system':
                 self._json(get_system_info())
+            elif path == '/api/monitor/cpu':
+                self._json({'data': get_cpu_history()})
+            elif path == '/api/monitor/memory':
+                self._json({'data': get_mem_history()})
             elif path == '/api/logs':
                 lines = int(params.get('lines', ['200'])[0])
                 self._json({'logs': get_logs(lines)})

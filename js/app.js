@@ -483,11 +483,26 @@ const app = createApp({
       try {
         const info = await HermesAPI.getSystemInfo();
         systemInfo.value = info;
-        const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-        monitorCpuData.value.push({ time: now, value: info.cpu_percent || 0 });
-        monitorMemData.value.push({ time: now, value: info.mem_percent || 0 });
-        if (monitorCpuData.value.length > 60) monitorCpuData.value.shift();
-        if (monitorMemData.value.length > 60) monitorMemData.value.shift();
+        // 尝试从后端获取历史数据
+        try {
+          const cpuResp = await fetch('/api/monitor/cpu');
+          const cpuData = await cpuResp.json();
+          if (cpuData.data && cpuData.data.length > 0) {
+            monitorCpuData.value = cpuData.data;
+          }
+          const memResp = await fetch('/api/monitor/memory');
+          const memData = await memResp.json();
+          if (memData.data && memData.data.length > 0) {
+            monitorMemData.value = memData.data;
+          }
+        } catch {
+          // 回退：前端采集
+          const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+          monitorCpuData.value.push({ time: now, value: info.cpu_percent || 0 });
+          monitorMemData.value.push({ time: now, value: info.mem_percent || 0 });
+          if (monitorCpuData.value.length > 60) monitorCpuData.value.shift();
+          if (monitorMemData.value.length > 60) monitorMemData.value.shift();
+        }
       } catch (err) {
         console.error('加载系统信息失败:', err);
       }
