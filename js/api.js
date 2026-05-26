@@ -143,6 +143,16 @@ const HermesAPI = {
     return this.proxy('/memory');
   },
 
+  /** 获取 CPU 历史数据（监控趋势图） */
+  async getMonitorCpu() {
+    return this.fetch(`${this.proxyBase}/api/monitor/cpu`);
+  },
+
+  /** 获取内存历史数据（监控趋势图） */
+  async getMonitorMemory() {
+    return this.fetch(`${this.proxyBase}/api/monitor/memory`);
+  },
+
   /** 获取插件列表 */
   async getPlugins() {
     return this.proxy('/plugins');

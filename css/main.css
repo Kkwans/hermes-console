@@ -25,8 +25,8 @@
   --red-dim: rgba(239, 68, 68, 0.1);
   --yellow: #f59e0b;
   --yellow-dim: rgba(245, 158, 11, 0.1);
-  --blue: #3b82f6;
-  --blue-dim: rgba(59, 130, 246, 0.1);
+  --blue: #525252;
+  --blue-dim: rgba(82, 82, 82, 0.08);
 
   /* Borders — shadow-as-border style */
   --border: rgba(0, 0, 0, 0.08);
@@ -89,8 +89,8 @@
   --red-dim: rgba(239, 68, 68, 0.15);
   --yellow: #f59e0b;
   --yellow-dim: rgba(245, 158, 11, 0.15);
-  --blue: #3b82f6;
-  --blue-dim: rgba(59, 130, 246, 0.15);
+  --blue: #a1a1a1;
+  --blue-dim: rgba(161, 161, 161, 0.1);
 
   --border: rgba(255, 255, 255, 0.1);
   --border-subtle: rgba(255, 255, 255, 0.06);
@@ -383,10 +383,10 @@ body {
   font-size: 0.85rem;
   font-family: inherit;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px rgba(82, 82, 82, 0.1);
 }
 .editing-input:focus {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 0 2px rgba(82, 82, 82, 0.2);
 }
 .btn-icon {
   display: inline-flex;
@@ -592,12 +592,17 @@ body {
 .chart-card {
   background: var(--bg-panel);
   border-radius: var(--radius-lg);
-  padding: 1.2rem;
-  box-shadow: rgba(0,0,0,0.08) 0px 0px 0px 1px, rgba(0,0,0,0.04) 0px 2px 2px;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
+  transition: border-color 0.15s;
+}
+.chart-card:hover {
+  border-color: var(--border-solid);
 }
 .chart-card h3 {
-  font-size: 0.9rem; font-weight: 600;
+  font-size: 0.85rem; font-weight: 500;
   margin-bottom: 1rem; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.05em;
 }
 .chart-container { width: 100%; height: 240px; }
 .chart-lg { height: 320px; }
@@ -1960,7 +1965,7 @@ mark.log-highlight {
   font-size: 1.15rem;
   flex-shrink: 0;
 }
-.plugin-icon-wrap.badge-blue { background: rgba(59,130,246,0.1); }
+.plugin-icon-wrap.badge-blue { background: rgba(82,82,82,0.08); }
 .plugin-icon-wrap.badge-green { background: rgba(16,185,129,0.1); }
 .plugin-icon-wrap.badge-yellow { background: rgba(245,158,11,0.1); }
 .plugin-icon-wrap.badge-purple { background: var(--bg-elevated); }
@@ -2101,7 +2106,7 @@ mark.log-highlight {
   font-size: 1.4rem;
   flex-shrink: 0;
 }
-.plugin-detail-icon.badge-blue { background: rgba(59,130,246,0.12); }
+.plugin-detail-icon.badge-blue { background: rgba(82,82,82,0.1); }
 .plugin-detail-icon.badge-green { background: rgba(16,185,129,0.12); }
 .plugin-detail-icon.badge-yellow { background: rgba(245,158,11,0.12); }
 .plugin-detail-icon.badge-purple { background: var(--bg-elevated); }

@@ -194,6 +194,7 @@ const app = createApp({
           xAxis: { axisLabel: { color: textColor } },
           yAxis: { axisLabel: { color: textColor }, splitLine: { lineStyle: { color: splitColor } } },
           tooltip: { backgroundColor: tooltipBg, borderColor: tooltipBorder, textStyle: { color: tooltipText } },
+          legend: { textStyle: { color: textColor } },
         });
       });
     }
@@ -483,17 +484,15 @@ const app = createApp({
       try {
         const info = await HermesAPI.getSystemInfo();
         systemInfo.value = info;
-        // 尝试从后端获取历史数据
+        // 从后端获取历史数据
         try {
-          const cpuResp = await fetch('/api/monitor/cpu');
-          const cpuData = await cpuResp.json();
-          if (cpuData.data && cpuData.data.length > 0) {
-            monitorCpuData.value = cpuData.data;
+          const cpuResp = await HermesAPI.getMonitorCpu();
+          if (cpuResp.data && cpuResp.data.length > 0) {
+            monitorCpuData.value = cpuResp.data;
           }
-          const memResp = await fetch('/api/monitor/memory');
-          const memData = await memResp.json();
-          if (memData.data && memData.data.length > 0) {
-            monitorMemData.value = memData.data;
+          const memResp = await HermesAPI.getMonitorMemory();
+          if (memResp.data && memResp.data.length > 0) {
+            monitorMemData.value = memResp.data;
           }
         } catch {
           // 回退：前端采集
@@ -531,7 +530,7 @@ const app = createApp({
       await Promise.all([loadGatewayStatus(), loadSystemInfo(), loadLogs()]);
       dashboardStats.value = [
         { icon: '⚡', label: 'Gateway 状态', value: gatewayRunning.value ? '运行中' : '已停止', iconBg: gatewayRunning.value ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' },
-        { icon: '💬', label: '活跃会话', value: sessions.value.length || '0', iconBg: 'rgba(59,130,246,0.1)' },
+        { icon: '💬', label: '活跃会话', value: sessions.value.length || '0', iconBg: 'rgba(82,82,82,0.08)' },
         { icon: '⏰', label: '定时任务', value: cronJobs.value.length || '0', iconBg: 'rgba(245,158,11,0.1)' },
         { icon: '🧩', label: '已安装技能', value: skills.value.length || '0', iconBg: 'rgba(128,128,128,0.1)' },
       ];
@@ -666,10 +665,10 @@ const app = createApp({
         cpuChartInst.setOption({
           ...makeChartOpt(),
           series: [{
-            type: 'line', data: [], smooth: true,
-            lineStyle: { color: '#3b82f6', width: 2 },
-            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.3)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } },
-            itemStyle: { color: '#3b82f6' },
+            type: 'line', data: [], smooth: true, symbol: 'none',
+            lineStyle: { color: '#525252', width: 2 },
+            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(82,82,82,0.15)' }, { offset: 1, color: 'rgba(82,82,82,0)' }] } },
+            itemStyle: { color: '#525252' },
           }],
         });
       }
@@ -678,10 +677,10 @@ const app = createApp({
         memChartInst.setOption({
           ...makeChartOpt(),
           series: [{
-            type: 'line', data: [], smooth: true,
-            lineStyle: { color: '#10b981', width: 2 },
-            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(16,185,129,0.3)' }, { offset: 1, color: 'rgba(16,185,129,0)' }] } },
-            itemStyle: { color: '#10b981' },
+            type: 'line', data: [], smooth: true, symbol: 'none',
+            lineStyle: { color: '#a1a1a1', width: 2 },
+            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(161,161,161,0.15)' }, { offset: 1, color: 'rgba(161,161,161,0)' }] } },
+            itemStyle: { color: '#a1a1a1' },
           }],
         });
       }
@@ -693,10 +692,10 @@ const app = createApp({
         monitorChartInst.setOption({
           ...makeChartOpt(),
           grid: { top: 30, right: 20, bottom: 30, left: 40 },
-          legend: { data: ['CPU', '内存'], textStyle: { color: '#a1a1a1' }, top: 0 },
+          legend: { data: ['CPU', '内存'], textStyle: { color: isDarkTheme.value ? '#a1a1a1' : '#666666' }, top: 0 },
           series: [
-            { name: 'CPU', type: 'line', data: [], smooth: true, lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' } },
-            { name: '内存', type: 'line', data: [], smooth: true, lineStyle: { color: '#10b981', width: 2 }, itemStyle: { color: '#10b981' } },
+            { name: 'CPU', type: 'line', data: [], smooth: true, symbol: 'none', lineStyle: { color: '#525252', width: 2 }, itemStyle: { color: '#525252' } },
+            { name: '内存', type: 'line', data: [], smooth: true, symbol: 'none', lineStyle: { color: '#a1a1a1', width: 2 }, itemStyle: { color: '#a1a1a1' } },
           ],
         });
       }
