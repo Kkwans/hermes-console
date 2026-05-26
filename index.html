@@ -1077,6 +1077,32 @@
       </div>
     </div>
 
+    <!-- Token 配置引导弹窗 -->
+    <div v-if="showTokenSetup" class="confirm-overlay token-setup-overlay">
+      <div class="token-setup-modal">
+        <div class="token-setup-icon">🔑</div>
+        <h3>配置 Gateway Token</h3>
+        <p class="token-setup-desc">
+          需要输入 Gateway Token 才能访问 API 功能。<br>
+          Token 可以在 OpenClaw 配置文件中获取。
+        </p>
+        <div class="token-setup-form">
+          <input v-model="tokenInput" type="password" placeholder="输入 Gateway Token..."
+                 class="token-input" @keyup.enter="saveToken">
+          <span class="token-hint">Token 将保存到 .env 文件中</span>
+        </div>
+        <div class="token-setup-actions">
+          <button @click="skipTokenSetup" class="btn-ghost">暂时跳过</button>
+          <button @click="saveToken" class="btn-primary" :disabled="!tokenInput.trim() || tokenSaving">
+            {{ tokenSaving ? '保存中...' : '保存并继续' }}
+          </button>
+        </div>
+        <div class="token-setup-link">
+          <a href="#" @click.prevent="navigate('settings'); showTokenSetup = false">前往系统设置 →</a>
+        </div>
+      </div>
+    </div>
+
     <!-- 确认弹窗 -->
     <div v-if="showConfirm" class="confirm-overlay" @click.self="showConfirm = false">
       <div class="confirm-modal">

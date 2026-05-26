@@ -122,6 +122,11 @@ const app = createApp({
     const confirmMsg = ref('');
     let confirmAction = () => {};
 
+    // Token setup
+    const showTokenSetup = ref(false);
+    const tokenInput = ref('');
+    const tokenSaving = ref(false);
+
     // Chart refs (template refs)
     const cpuChartEl = ref(null);
     const memChartEl = ref(null);
@@ -620,6 +625,49 @@ const app = createApp({
         loadPlugins(),
       ]);
       loadDashboardStats();
+      // 检查 Token 配置
+      checkTokenStatus();
+    }
+
+    async function checkTokenStatus() {
+      try {
+        const status = await HermesAPI.getTokenStatus();
+        if (!status.has_token) {
+          showTokenSetup.value = true;
+        }
+      } catch {
+        // API 不可用时不弹窗
+      }
+    }
+
+    async function saveToken() {
+      const token = tokenInput.value.trim();
+      if (!token) {
+        toast('请输入 Gateway Token', 'error');
+        return;
+      }
+      tokenSaving.value = true;
+      try {
+        const result = await HermesAPI.saveToken(token);
+        if (result.ok) {
+          toast('Token 已保存，正在刷新数据...', 'success');
+          showTokenSetup.value = false;
+          tokenInput.value = '';
+          // 重新加载所有数据
+          await loadAll();
+        } else {
+          toast('保存失败: ' + (result.error || '未知错误'), 'error');
+        }
+      } catch (err) {
+        toast('保存失败: ' + err.message, 'error');
+      } finally {
+        tokenSaving.value = false;
+      }
+    }
+
+    function skipTokenSetup() {
+      showTokenSetup.value = false;
+      toast('已跳过配置，部分功能可能不可用', 'info');
     }
 
     // ===== Page-specific initialization =====
@@ -1082,6 +1130,7 @@ const app = createApp({
       showConfirm, confirmIcon, confirmTitle, confirmMsg,
       confirmAction,
       isDarkTheme, toggleTheme,
+      showTokenSetup, tokenInput, tokenSaving, saveToken, skipTokenSetup, checkTokenStatus,
     };
   },
 });

@@ -766,6 +766,41 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
                 self._json({'skills': get_skills()})
             elif path == '/api/system':
                 self._json(get_system_info())
+            elif path == '/api/token/status':
+                # 检查 Gateway Token 是否已配置
+                self._json({
+                    'configured': bool(GATEWAY_INTERNAL_TOKEN),
+                    'has_token': bool(GATEWAY_INTERNAL_TOKEN),
+                })
+            elif path == '/api/token/save' and method == 'POST':
+                # 保存 Gateway Token 到 .env 文件
+                token = body.get('token', '').strip() if body else ''
+                if not token:
+                    self._json({'error': 'Token 不能为空'}, 400)
+                    return
+                try:
+                    env_path = DATA_DIR / '.env'
+                    env_content = ''
+                    if env_path.exists():
+                        env_content = env_path.read_text()
+                    # 更新或添加 GATEWAY_INTERNAL_TOKEN
+                    lines = env_content.split('\n')
+                    found = False
+                    for i, line in enumerate(lines):
+                        if line.startswith('GATEWAY_INTERNAL_TOKEN='):
+                            lines[i] = f'GATEWAY_INTERNAL_TOKEN={token}'
+                            found = True
+                            break
+                    if not found:
+                        lines.append(f'GATEWAY_INTERNAL_TOKEN={token}')
+                    env_path.write_text('\n'.join(lines))
+                    # 更新当前进程的环境变量
+                    global GATEWAY_INTERNAL_TOKEN
+                    GATEWAY_INTERNAL_TOKEN = token
+                    os.environ['GATEWAY_INTERNAL_TOKEN'] = token
+                    self._json({'ok': True, 'message': 'Token 已保存'})
+                except Exception as e:
+                    self._json({'error': f'保存失败: {str(e)}'}, 500)
             elif path == '/api/monitor/cpu':
                 self._json({'data': get_cpu_history()})
             elif path == '/api/monitor/memory':

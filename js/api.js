@@ -165,4 +165,17 @@ const HermesAPI = {
       body: JSON.stringify({ provider, model }),
     });
   },
+
+  /** 检查 Token 状态 */
+  async getTokenStatus() {
+    return this.proxy('/token/status');
+  },
+
+  /** 保存 Gateway Token */
+  async saveToken(token) {
+    return this.proxy('/token/save', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
 };

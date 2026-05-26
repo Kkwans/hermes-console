@@ -160,6 +160,87 @@ body {
 }
 .setup-error { color: var(--red); font-size: 0.8rem; margin-top: 0.5rem; }
 
+/* Token Setup Modal */
+.token-setup-overlay {
+  z-index: 1001;
+}
+.token-setup-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem;
+  width: 90%; max-width: 400px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.token-setup-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+.token-setup-modal h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.token-setup-desc {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.token-setup-form {
+  margin-bottom: 1.5rem;
+}
+.token-input {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.2s;
+}
+.token-input:focus {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+.token-hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.token-setup-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.token-setup-actions .btn-primary {
+  width: auto;
+  margin: 0;
+  padding: 0.6rem 1.5rem;
+}
+.token-setup-actions .btn-ghost {
+  padding: 0.6rem 1.2rem;
+}
+.token-setup-link {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+.token-setup-link a {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.token-setup-link a:hover {
+  color: var(--text-primary);
+}
+
 /* ===== Layout ===== */
 .app-layout {
   display: flex;
