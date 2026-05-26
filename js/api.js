@@ -135,7 +135,7 @@ const HermesAPI = {
 
   /** 获取日志 */
   async getLogs(lines = 200) {
-    return this.proxy(`/logs?lines=${lines}`);
+    return this.proxy(`/logs?lines=${Math.min(Math.max(lines, 10), 1000)}`);
   },
 
   /** 获取内存数据 */

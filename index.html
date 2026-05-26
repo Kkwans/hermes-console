@@ -757,34 +757,40 @@
           </div>
 
           <!-- 日志查看 -->
-          <div v-else-if="currentPage === 'logs'" class="page-logs">
-            <div class="page-toolbar">
-              <div class="log-filters">
-                <select v-model="logLevel" class="filter-select">
-                  <option value="">全部级别</option>
-                  <option value="ERROR">ERROR</option>
-                  <option value="WARN">WARN</option>
-                  <option value="INFO">INFO</option>
-                  <option value="DEBUG">DEBUG</option>
-                </select>
-                <input v-model="logSearch" type="text" placeholder="搜索日志..." class="search-input">
+          <div v-else-if=\"currentPage === 'logs'\" class=\"page-logs\">
+            <div class=\"page-toolbar\">
+              <div class=\"log-filters\">
+                <div class=\"log-level-tabs\">
+                  <button v-for=\"lv in ['', 'ERROR', 'WARN', 'INFO', 'DEBUG']\" :key=\"lv\"
+                          :class=\"['log-level-btn', { active: logLevel === lv }]\"
+                          :data-level=\"lv\"
+                          @click=\"logLevel = lv\">
+                    <span v-if=\"lv\" class=\"level-dot\" :class=\"'dot-' + lv.toLowerCase()\"></span>
+                    {{ lv || '全部' }}
+                  </button>
+                </div>
+                <input v-model=\"logSearch\" type=\"text\" placeholder=\"搜索日志内容...\" class=\"search-input log-search\">
               </div>
-              <div class="log-actions">
-                <label class="auto-scroll-label">
-                  <input v-model="autoScroll" type="checkbox"> 自动滚动
+              <div class=\"log-actions\">
+                <span class=\"log-count\" v-if=\"filteredLogs.length\">{{ filteredLogs.length }} / {{ logEntries.length }} 条</span>
+                <label class=\"auto-refresh-label\">
+                  <span class=\"auto-refresh-dot\" :class=\"autoRefresh ? 'dot-on' : 'dot-off'\"></span>
+                  <input v-model=\"autoRefresh\" type=\"checkbox\" hidden>
+                  <span @click=\"toggleAutoRefresh\">{{ autoRefresh ? '自动刷新' : '手动刷新' }}</span>
                 </label>
-                <span class="log-count" v-if="filteredLogs.length">{{ filteredLogs.length }} 条</span>
-                <button @click="loadLogs" class="btn-ghost">刷新</button>
+                <button @click=\"loadLogs\" class=\"btn-ghost\">↻ 刷新</button>
               </div>
             </div>
-            <div class="log-viewer" ref="logViewer">
-              <div v-for="(log, i) in filteredLogs" :key="i" class="log-entry" :class="'log-' + (log.level || 'info').toLowerCase()">
-                <span class="log-time">{{ log.time }}</span>
-                <span class="log-level">{{ (log.level || 'INFO').slice(0, 4) }}</span>
-                <span class="log-message" v-html="highlightLogMsg(log.msg)"></span>
+            <div class=\"log-viewer\" ref=\"logViewer\">
+              <div v-for=\"(log, i) in filteredLogs\" :key=\"i\" class=\"log-entry\" :class=\"'log-' + (log.level || 'info').toLowerCase()\">
+                <span class=\"log-time\">{{ log.time }}</span>
+                <span class=\"log-level\">{{ (log.level || 'INFO').slice(0, 4) }}</span>
+                <span class=\"log-message\" v-html=\"highlightLogMsg(log.msg)\"></span>
               </div>
-              <div v-if="!filteredLogs.length" class="empty-state">
-                <p>暂无日志数据</p>
+              <div v-if=\"!filteredLogs.length\" class=\"empty-state\">
+                <div class=\"empty-icon\">📝</div>
+                <p>{{ logSearch || logLevel ? '未找到匹配的日志' : '暂无日志数据' }}</p>
+                <p v-if=\"logSearch || logLevel\" class=\"empty-hint\">尝试调整筛选条件</p>
               </div>
             </div>
           </div>

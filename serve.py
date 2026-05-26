@@ -772,6 +772,7 @@ class ConsoleHandler(http.server.SimpleHTTPRequestHandler):
                 self._json({'data': get_mem_history()})
             elif path == '/api/logs':
                 lines = int(params.get('lines', ['200'])[0])
+                lines = min(max(lines, 10), 1000)  # 限制 10-1000 条
                 self._json({'logs': get_logs(lines)})
             elif path == '/api/plugins':
                 self._json({'plugins': get_plugins()})

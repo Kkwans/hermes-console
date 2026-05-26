@@ -101,6 +101,8 @@ const app = createApp({
     const logLevel = ref('');
     const logSearch = ref('');
     const autoScroll = ref(true);
+    const autoRefresh = ref(true);
+    let logRefreshTimer = null;
 
     // Monitor
     const systemInfo = ref({});
@@ -509,11 +511,37 @@ const app = createApp({
 
     async function loadLogs() {
       try {
-        const data = await HermesAPI.getLogs(300);
+        const data = await HermesAPI.getLogs(200);
         logEntries.value = data.logs || [];
         recentLogs.value = (data.logs || []).slice(-20);
       } catch (err) {
         console.error('Failed to load logs:', err);
+      }
+    }
+
+    function toggleAutoRefresh() {
+      autoRefresh.value = !autoRefresh.value;
+      if (autoRefresh.value) {
+        startLogRefresh();
+      } else {
+        stopLogRefresh();
+      }
+      toast(autoRefresh.value ? '日志自动刷新已开启' : '日志自动刷新已关闭', 'info');
+    }
+
+    function startLogRefresh() {
+      stopLogRefresh();
+      logRefreshTimer = setInterval(() => {
+        if (currentPage.value === 'logs') {
+          loadLogs();
+        }
+      }, 5000);
+    }
+
+    function stopLogRefresh() {
+      if (logRefreshTimer) {
+        clearInterval(logRefreshTimer);
+        logRefreshTimer = null;
       }
     }
 
@@ -988,6 +1016,9 @@ const app = createApp({
       // Auto-connect: no setup dialog needed, backend handles Gateway auth
       loadAll();
 
+      // Start log auto-refresh
+      startLogRefresh();
+
       const hash = window.location.hash.replace('#/', '');
       if (hash && pageTitleMap[hash]) {
         currentPage.value = hash;
@@ -1031,6 +1062,7 @@ const app = createApp({
       showProviderForm, providerFormMode, providerForm, openProviderForm, submitProviderForm, confirmDeleteProvider,
       editableConfig, saveSettings, loadConfig,
       logEntries, filteredLogs, logLevel, logSearch, autoScroll, loadLogs, logViewer,
+      autoRefresh, toggleAutoRefresh,
       systemInfo, monitorChartEl,
       monitorCpuData, monitorMemData,
       plugins, pluginSearch, pluginTypeFilter, filteredPlugins, loadPlugins,
