@@ -79,3 +79,35 @@
 - **验证结果**: 通过 — 图表显示平滑曲线，60 个数据点实时更新，无紫蓝品牌色，PC/移动端正常
 - **耗时**: ~10 分钟
 - **下一步**: T5 — 增强日志模块
+### 2026-05-26 09:20 — T5: 增强日志模块
+
+- **任务**: T5 — 增强日志模块
+- **实际修改**:
+  - `serve.py`:
+    - `/api/logs` 端点添加数量限制（10-1000 条），默认 200 条
+  - `js/app.js`:
+    - `loadLogs()` 默认参数从 300 改为 200
+    - 新增 `autoRefresh` 状态和 `logRefreshTimer` 变量
+    - 新增 `toggleAutoRefresh()` 切换自动刷新
+    - 新增 `startLogRefresh()` / `stopLogRefresh()` 管理 5 秒刷新定时器
+    - `onMounted` 中启动日志自动刷新
+  - `js/api.js`:
+    - `getLogs()` 添加前端数量验证（10-1000）
+  - `index.html`:
+    - 日志级别筛选从 `<select>` 下拉框改为按钮组（全部/ERROR/WARN/INFO/DEBUG）
+    - 每个按钮带颜色指示点（.level-dot）
+    - 搜索框 placeholder 改为"搜索日志内容..."
+    - 新增自动刷新开关（绿色指示点 + 文字切换）
+    - 计数显示改为 `filteredLogs.length / logEntries.length 条`
+    - 空状态增加图标和条件提示文案
+  - `css/main.css`:
+    - 新增 `.log-level-tabs` 按钮组容器样式（圆角背景 + 2px 内边距）
+    - 新增 `.log-level-btn` 按钮样式（active 时白色背景 + 阴影）
+    - 新增 `[data-level]` 颜色指示：ERROR 红、WARN 黄、INFO 灰、DEBUG 灰
+    - 新增 `.level-dot` 6px 颜色圆点
+    - 新增 `.auto-refresh-label` 自动刷新标签样式
+    - 新增 `.auto-refresh-dot` 指示点样式（开启时绿色带光晕）
+    - 移动端适配：按钮组和搜索框全宽
+- **验证结果**: 通过 — 页面正常加载，级别按钮可用，自动刷新正常，200 条日志显示，关键词高亮正常
+- **耗时**: ~8 分钟
+- **下一步**: T6 — 实现首次访问 Token 引导
